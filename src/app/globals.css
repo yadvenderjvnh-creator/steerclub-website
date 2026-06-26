@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 17%;
+    --card-foreground: 0 0% 100%;
+    --primary: 72 100% 59%;
+    --primary-foreground: 0 0% 7%;
+    --secondary: 0 0% 17%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 17%;
+    --muted-foreground: 0 0% 44%;
+    --accent: 72 100% 59%;
+    --accent-foreground: 0 0% 7%;
+    --border: 0 0% 17%;
+    --input: 0 0% 17%;
+    --ring: 72 100% 59%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-asphalt text-white font-body;
+    background-color: #111111;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-black tracking-tight;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .lime-text {
+    color: #D7FF2F;
+  }
+
+  .lime-bg {
+    background-color: #D7FF2F;
+  }
+
+  .glass {
+    background: rgba(43, 43, 43, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-dark {
+    background: rgba(17, 17, 17, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .section-pad {
+    @apply py-20 md:py-32;
+  }
+
+  .prose-sc {
+    @apply text-white/80 font-body text-lg leading-relaxed;
+  }
+
+  .score-gradient {
+    background: conic-gradient(#D7FF2F var(--pct), #2B2B2B 0);
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-300 hover:-translate-y-1;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #111111;
+}
+::-webkit-scrollbar-thumb {
+  background: #2B2B2B;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #707070;
+}
+
+/* Selection */
+::selection {
+  background: #D7FF2F;
+  color: #111111;
+}
+
+/* Razorpay button override */
+.razorpay-payment-button {
+  display: none !important;
+}
