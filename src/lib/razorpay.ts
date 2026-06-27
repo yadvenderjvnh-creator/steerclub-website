@@ -22,6 +22,18 @@ export async function createOrder(amountInPaise: number, receiptId: string, note
   });
 }
 
+/** Refund a captured payment (full if amountPaise omitted). Returns the Razorpay refund object. */
+export async function refundPayment(
+  paymentId: string,
+  amountPaise?: number,
+  notes?: Record<string, string>
+) {
+  const opts: Record<string, unknown> = {};
+  if (amountPaise && amountPaise > 0) opts.amount = amountPaise;
+  if (notes) opts.notes = notes;
+  return getRazorpay().payments.refund(paymentId, opts);
+}
+
 export function verifyPaymentSignature(
   orderId: string,
   paymentId: string,

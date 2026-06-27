@@ -1,66 +1,28 @@
-import { desc, eq } from "drizzle-orm";
 import { IndianRupee, Clock, RotateCcw } from "lucide-react";
-import { db } from "@/lib/db";
-import { assessmentBookings, programBookings, programs } from "@/lib/db/schema";
 import { StatCard } from "@/components/admin/stat-card";
 import { formatINR } from "@/lib/utils";
 import { PaymentsTable, type PaymentRow } from "./payments-table";
 import { requireRole } from "@/lib/auth/session";
+import { getAllPayments, getRevenueSummary } from "@/lib/finance/queries";
 
 export const dynamic = "force-dynamic";
 
-const PAID = ["confirmed", "completed"] as const;
-
 export default async function PaymentsPage() {
   await requireRole(["admin"]);
-  const [asmt, progs] = await Promise.all([
-    db.select().from(assessmentBookings).orderBy(desc(assessmentBookings.createdAt)),
-    db
-      .select({
-        id: programBookings.id,
-        name: programBookings.name,
-        email: programBookings.email,
-        amount: programBookings.amount,
-        status: programBookings.status,
-        razorpayPaymentId: programBookings.razorpayPaymentId,
-        createdAt: programBookings.createdAt,
-        programName: programs.name,
-      })
-      .from(programBookings)
-      .leftJoin(programs, eq(programBookings.programId, programs.id))
-      .orderBy(desc(programBookings.createdAt)),
-  ]);
+  const all = await getAllPayments();
+  const { revenue, outstanding, refunded } = await getRevenueSummary(all);
 
-  const all = [
-    ...asmt.map((b) => ({
-      id: b.id,
-      item: "Steer Score Assessment",
-      name: b.name,
-      email: b.email,
-      amount: b.amount,
-      status: b.status,
-      paymentId: b.razorpayPaymentId,
-      createdAt: b.createdAt,
-    })),
-    ...progs.map((b) => ({
-      id: b.id,
-      item: b.programName ?? "Program",
-      name: b.name,
-      email: b.email,
-      amount: b.amount,
-      status: b.status,
-      paymentId: b.razorpayPaymentId,
-      createdAt: b.createdAt,
-    })),
-  ];
-
-  const revenue = all.filter((r) => PAID.includes(r.status as (typeof PAID)[number])).reduce((s, r) => s + r.amount, 0);
-  const outstanding = all.filter((r) => r.status === "pending").reduce((s, r) => s + r.amount, 0);
-  const refunded = all.filter((r) => r.status === "refunded").reduce((s, r) => s + r.amount, 0);
-
-  const rows: PaymentRow[] = all
-    .map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }))
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const rows: PaymentRow[] = all.map((r) => ({
+    id: r.id,
+    source: r.source,
+    item: r.item,
+    name: r.name ?? "—",
+    email: r.email ?? "—",
+    amount: r.amount,
+    status: r.status,
+    paymentId: r.paymentId,
+    createdAt: r.createdAt.toISOString(),
+  }));
 
   return (
     <div>

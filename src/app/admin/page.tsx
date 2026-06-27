@@ -1,4 +1,4 @@
-import { and, gte, eq, desc, inArray, sql, count } from "drizzle-orm";
+import { and, gte, eq, desc, count } from "drizzle-orm";
 import {
   CalendarCheck,
   IndianRupee,
@@ -9,8 +9,6 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import {
-  assessmentBookings,
-  programBookings,
   leads,
   users,
   events,
@@ -19,31 +17,9 @@ import {
 import { StatCard } from "@/components/admin/stat-card";
 import { formatINR } from "@/lib/utils";
 import { requireRole } from "@/lib/auth/session";
+import { getAllPayments, revenueBetween } from "@/lib/finance/queries";
 
 export const dynamic = "force-dynamic";
-
-const PAID = ["confirmed", "completed"] as const;
-
-async function sumAmount(
-  table: typeof assessmentBookings | typeof programBookings,
-  from?: Date
-) {
-  const conds = [inArray(table.status, [...PAID])];
-  if (from) conds.push(gte(table.createdAt, from));
-  const [r] = await db
-    .select({ s: sql<number>`coalesce(sum(${table.amount}),0)::int` })
-    .from(table)
-    .where(and(...conds));
-  return r?.s ?? 0;
-}
-
-async function pendingAmount(table: typeof assessmentBookings | typeof programBookings) {
-  const [r] = await db
-    .select({ s: sql<number>`coalesce(sum(${table.amount}),0)::int` })
-    .from(table)
-    .where(eq(table.status, "pending"));
-  return r?.s ?? 0;
-}
 
 export default async function AdminDashboard() {
   await requireRole(["admin"]);
@@ -52,28 +28,8 @@ export default async function AdminDashboard() {
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
 
-  const [
-    asmtToday,
-    progToday,
-    revTodayA,
-    revTodayP,
-    revMtdA,
-    revMtdP,
-    outA,
-    outP,
-    newLeads,
-    activeStudents,
-    upcomingEvents,
-    recent,
-  ] = await Promise.all([
-    db.select({ c: count() }).from(assessmentBookings).where(gte(assessmentBookings.createdAt, startToday)),
-    db.select({ c: count() }).from(programBookings).where(gte(programBookings.createdAt, startToday)),
-    sumAmount(assessmentBookings, startToday),
-    sumAmount(programBookings, startToday),
-    sumAmount(assessmentBookings, startMonth),
-    sumAmount(programBookings, startMonth),
-    pendingAmount(assessmentBookings),
-    pendingAmount(programBookings),
+  const [payments, newLeads, activeStudents, upcomingEvents, recent] = await Promise.all([
+    getAllPayments(),
     db.select({ c: count() }).from(leads).where(gte(leads.createdAt, sevenDaysAgo)),
     db.select({ c: count() }).from(users).where(eq(users.role, "client")),
     db.select({ c: count() }).from(events).where(and(eq(events.isPublished, true), gte(events.eventDate, now))),
@@ -91,10 +47,10 @@ export default async function AdminDashboard() {
       .limit(10),
   ]);
 
-  const bookingsToday = (asmtToday[0]?.c ?? 0) + (progToday[0]?.c ?? 0);
-  const revenueToday = revTodayA + revTodayP;
-  const revenueMtd = revMtdA + revMtdP;
-  const outstanding = outA + outP;
+  const bookingsToday = payments.filter((p) => p.createdAt >= startToday).length;
+  const revenueToday = revenueBetween(payments, startToday);
+  const revenueMtd = revenueBetween(payments, startMonth);
+  const outstanding = payments.filter((p) => p.status === "pending").reduce((s, p) => s + p.amount, 0);
 
   return (
     <div>
