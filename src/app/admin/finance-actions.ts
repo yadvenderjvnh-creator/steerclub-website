@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
@@ -10,6 +10,7 @@ import {
   eventRegistrations,
   memberships,
   refunds,
+  invoices,
   activityLog,
 } from "@/lib/db/schema";
 import { refundPayment } from "@/lib/razorpay";
@@ -72,6 +73,10 @@ export async function issueRefund(input: {
   }
 
   await markSourceRefunded(input.source, input.bookingId);
+  await db
+    .update(invoices)
+    .set({ status: "refunded" })
+    .where(and(eq(invoices.source, input.source), eq(invoices.bookingId, input.bookingId)));
   await db.insert(activityLog).values({
     actorId: admin.id,
     action: "payment.refund",

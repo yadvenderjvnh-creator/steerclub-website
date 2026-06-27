@@ -14,6 +14,7 @@ export type PaymentRow = {
   amount: number;
   status: string;
   paymentId: string | null;
+  invoiceId?: string | null;
   createdAt: string;
 };
 
@@ -51,6 +52,19 @@ export function PaymentsTable({ rows }: { rows: PaymentRow[] }) {
       render: (r) => <span className="text-xs font-mono text-steel">{r.paymentId ?? "—"}</span>,
     },
     { key: "status", header: "Status", value: (r) => r.status, render: (r) => <StatusBadge status={r.status} /> },
+    {
+      key: "invoice",
+      header: "Invoice",
+      value: (r) => (r.invoiceId ? "1" : ""),
+      render: (r) =>
+        r.invoiceId ? (
+          <a href={`/admin/payments/invoice/${r.invoiceId}`} target="_blank" rel="noreferrer" className="text-lime font-heading font-black text-xs uppercase hover:underline">
+            PDF ↗
+          </a>
+        ) : (
+          <span className="text-steel text-xs">—</span>
+        ),
+    },
     { key: "refund", header: "", value: () => "", render: (r) => <RefundButton row={r} /> },
   ];
 

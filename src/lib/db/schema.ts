@@ -434,6 +434,32 @@ export const refunds = pgTable("refunds", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Numbered tax-invoice/receipt per paid booking (GST-ready via nullable gstBreakup).
+export const invoices = pgTable("invoices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  number: varchar("number", { length: 32 }).notNull().unique(),
+  source: varchar("source", { length: 20 }).notNull(),
+  bookingId: uuid("booking_id").notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  email: varchar("email", { length: 255 }),
+  lineItem: varchar("line_item", { length: 255 }).notNull(),
+  subtotal: integer("subtotal").notNull(), // paise (taxable value when GST applies, else == total)
+  gstBreakup: jsonb("gst_breakup").$type<{
+    rate: number;
+    taxable: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    gstin: string;
+    hsn: string;
+  } | null>(),
+  total: integer("total").notNull(), // paise charged
+  status: varchar("status", { length: 20 }).default("issued").notNull(), // issued | refunded
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
+}, (t) => ({
+  uniqSourceBooking: unique().on(t.source, t.bookingId),
+}));
+
 // Gift purchases (membership or program), redeemable by a recipient via code.
 export const giftPurchases = pgTable("gift_purchases", {
   id: uuid("id").primaryKey().defaultRandom(),

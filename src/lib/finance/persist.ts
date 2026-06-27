@@ -39,18 +39,18 @@ export async function persistMembership(input: {
   tier: string;
   billing: string;
   paymentId: string;
-}): Promise<void> {
+}): Promise<{ id: string; amount: number; userId: string } | null> {
   const amount = membershipAmount(input.tier, input.billing);
-  if (amount === null) return;
+  if (amount === null) return null;
   const isAnnual = input.billing !== "monthly";
 
   // Don't double-insert for the same payment.
   const [dupe] = await db
-    .select({ id: memberships.id })
+    .select({ id: memberships.id, amount: memberships.amount, userId: memberships.userId })
     .from(memberships)
     .where(eq(memberships.razorpayPaymentId, input.paymentId))
     .limit(1);
-  if (dupe) return;
+  if (dupe) return { id: dupe.id, amount: dupe.amount ?? amount, userId: dupe.userId };
 
   const userId = await findOrCreateUser(input.email, input.name, input.phone);
   const start = new Date();
@@ -58,16 +58,20 @@ export async function persistMembership(input: {
   if (isAnnual) end.setFullYear(end.getFullYear() + 1);
   else end.setMonth(end.getMonth() + 1);
 
-  await db.insert(memberships).values({
-    userId,
-    tier: input.tier as Tier,
-    status: "active",
-    startDate: start,
-    endDate: end,
-    isAnnual,
-    amount,
-    razorpayPaymentId: input.paymentId,
-  });
+  const [row] = await db
+    .insert(memberships)
+    .values({
+      userId,
+      tier: input.tier as Tier,
+      status: "active",
+      startDate: start,
+      endDate: end,
+      isAnnual,
+      amount,
+      razorpayPaymentId: input.paymentId,
+    })
+    .returning({ id: memberships.id });
+  return { id: row.id, amount, userId };
 }
 
 /** Persist a confirmed gift purchase with a redeemable code. Idempotent per payment. */
@@ -80,25 +84,28 @@ export async function persistGift(input: {
   recipientName?: string | null;
   recipientEmail?: string | null;
   paymentId: string;
-}): Promise<string | null> {
+}): Promise<{ id: string; code: string } | null> {
   const [dupe] = await db
     .select({ id: giftPurchases.id, code: giftPurchases.code })
     .from(giftPurchases)
     .where(eq(giftPurchases.razorpayPaymentId, input.paymentId))
     .limit(1);
-  if (dupe) return dupe.code;
+  if (dupe) return { id: dupe.id, code: dupe.code };
 
   const code = `GIFT-${randomBytes(4).toString("hex").toUpperCase()}`;
-  await db.insert(giftPurchases).values({
-    type: input.giftType,
-    refId: input.refId,
-    amount: input.amount,
-    code,
-    buyerName: input.buyerName ?? null,
-    buyerEmail: input.buyerEmail ?? null,
-    recipientName: input.recipientName ?? null,
-    recipientEmail: input.recipientEmail ?? null,
-    razorpayPaymentId: input.paymentId,
-  });
-  return code;
+  const [row] = await db
+    .insert(giftPurchases)
+    .values({
+      type: input.giftType,
+      refId: input.refId,
+      amount: input.amount,
+      code,
+      buyerName: input.buyerName ?? null,
+      buyerEmail: input.buyerEmail ?? null,
+      recipientName: input.recipientName ?? null,
+      recipientEmail: input.recipientEmail ?? null,
+      razorpayPaymentId: input.paymentId,
+    })
+    .returning({ id: giftPurchases.id });
+  return { id: row.id, code };
 }

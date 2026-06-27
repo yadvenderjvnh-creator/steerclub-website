@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Download } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getUserPayments } from "@/lib/portal/queries";
+import { getUserInvoices } from "@/lib/billing/invoices";
 import { formatINR } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Payments — Dashboard" };
@@ -19,7 +21,10 @@ const PAID = ["confirmed", "completed"];
 
 export default async function DashboardPaymentsPage() {
   const user = await requireUser();
-  const payments = await getUserPayments(user);
+  const [payments, invoices] = await Promise.all([
+    getUserPayments(user),
+    getUserInvoices(user.id, user.email),
+  ]);
 
   const totalPaid = payments.filter((p) => PAID.includes(p.status)).reduce((s, p) => s + p.amount, 0);
   const dues = payments.filter((p) => p.status === "pending").reduce((s, p) => s + p.amount, 0);
@@ -78,6 +83,35 @@ export default async function DashboardPaymentsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {invoices.length > 0 && (
+        <div>
+          <h2 className="font-heading font-black text-sm text-white uppercase tracking-wide mb-3">Invoices & Receipts</h2>
+          <div className="glass rounded-xl divide-y divide-white/5">
+            {invoices.map((inv) => (
+              <div key={inv.id} className="p-4 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm text-white font-ui">{inv.number}</p>
+                  <p className="text-xs text-steel font-ui mt-0.5">
+                    {inv.lineItem} · {new Date(inv.issuedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="font-heading font-black text-white">{formatINR(inv.total)}</span>
+                  <a
+                    href={`/dashboard/payments/${inv.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 border border-white/15 text-white/80 font-heading font-black text-xs uppercase px-3 py-1.5 rounded-lg hover:bg-white/5"
+                  >
+                    <Download className="w-3.5 h-3.5" /> PDF
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

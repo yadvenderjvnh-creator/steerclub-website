@@ -4,6 +4,7 @@ import { assessmentBookings, programBookings, eventRegistrations, events, users 
 import { markLeadConverted } from "@/lib/portal/leads";
 import { notifyUserByEmail } from "@/lib/portal/notify";
 import { persistMembership, persistGift, membershipAmount } from "./persist";
+import { ensureInvoice } from "@/lib/billing/invoices";
 import { getProgramBySlug } from "@/lib/utils";
 
 export type ConfirmParams = {
@@ -48,7 +49,7 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
 
   if (p.type === "assessment") {
     if (p.email) {
-      await db
+      const updated = await db
         .update(assessmentBookings)
         .set({
           status: "confirmed",
@@ -56,12 +57,16 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
           razorpayPaymentId: p.paymentId,
           confirmedAt: new Date(),
         })
-        .where(and(eq(assessmentBookings.email, p.email), eq(assessmentBookings.status, "pending")));
+        .where(and(eq(assessmentBookings.email, p.email), eq(assessmentBookings.status, "pending")))
+        .returning({ id: assessmentBookings.id, amount: assessmentBookings.amount });
+      if (updated[0]) {
+        await ensureInvoice({ source: "assessment", bookingId: updated[0].id, email: p.email, item: "Steer Score Assessment", amount: updated[0].amount });
+      }
     }
   } else if (p.type === "program") {
     if (p.email) {
       const [pending] = await db
-        .select({ id: programBookings.id })
+        .select({ id: programBookings.id, amount: programBookings.amount })
         .from(programBookings)
         .where(and(eq(programBookings.email, p.email), eq(programBookings.status, "pending")))
         .orderBy(desc(programBookings.createdAt))
@@ -71,15 +76,16 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
           .update(programBookings)
           .set({ status: "confirmed", razorpayOrderId: p.orderId ?? undefined, razorpayPaymentId: p.paymentId })
           .where(eq(programBookings.id, pending.id));
+        await ensureInvoice({ source: "program", bookingId: pending.id, email: p.email, item: "SteerClub Program", amount: pending.amount });
       }
     }
   } else if (p.type === "event") {
     if (p.email && p.eventSlug) {
       const email = p.email.toLowerCase().trim();
       const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-      const [ev] = await db.select({ id: events.id }).from(events).where(eq(events.slug, p.eventSlug)).limit(1);
+      const [ev] = await db.select({ id: events.id, title: events.title }).from(events).where(eq(events.slug, p.eventSlug)).limit(1);
       if (u && ev) {
-        await db
+        const updated = await db
           .update(eventRegistrations)
           .set({ status: "confirmed", razorpayOrderId: p.orderId ?? undefined, razorpayPaymentId: p.paymentId })
           .where(
@@ -88,12 +94,16 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
               eq(eventRegistrations.eventId, ev.id),
               eq(eventRegistrations.status, "pending")
             )
-          );
+          )
+          .returning({ id: eventRegistrations.id, amount: eventRegistrations.amount });
+        if (updated[0] && (updated[0].amount ?? 0) > 0) {
+          await ensureInvoice({ source: "event", bookingId: updated[0].id, email, userId: u.id, item: ev.title, amount: updated[0].amount ?? 0 });
+        }
       }
     }
   } else if (p.type === "membership") {
     if (p.email && p.tier) {
-      await persistMembership({
+      const m = await persistMembership({
         email: p.email,
         name: p.name,
         phone: p.phone,
@@ -101,6 +111,9 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
         billing: p.billing ?? "annual",
         paymentId: p.paymentId,
       });
+      if (m) {
+        await ensureInvoice({ source: "membership", bookingId: m.id, email: p.email, userId: m.userId, item: `SteerClub Membership — ${p.tier}`, amount: m.amount });
+      }
     }
   } else if (p.type === "gift") {
     const giftType = p.giftType ?? "membership";
@@ -114,7 +127,7 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
       refId = program?.slug ?? null;
       amount = program?.price ?? 0;
     }
-    await persistGift({
+    const g = await persistGift({
       giftType,
       refId,
       amount,
@@ -124,5 +137,8 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
       recipientEmail: p.recipientEmail,
       paymentId: p.paymentId,
     });
+    if (g && amount > 0) {
+      await ensureInvoice({ source: "gift", bookingId: g.id, email: p.buyerEmail, item: `Gift — ${giftType}`, amount });
+    }
   }
 }
