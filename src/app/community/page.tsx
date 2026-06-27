@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Users, MapPin, Calendar } from "lucide-react";
+import { getCityChapters } from "@/lib/community/queries";
 
 export const metadata: Metadata = {
   title: "Community — City Chapters Across India",
   description:
     "SteerClub community chapters in Chandigarh, Delhi, Bangalore, Mumbai and more. Monthly city drives, skill workshops, and a private members club for drivers who take their driving seriously.",
 };
+
+export const dynamic = "force-dynamic";
 
 const CITY_CHAPTERS = [
   {
@@ -65,7 +68,23 @@ const CITY_CHAPTERS = [
   },
 ];
 
-export default function CommunityPage() {
+export default async function CommunityPage() {
+  // Live per-city aggregates (upcoming events + next event) overlaid on editorial copy.
+  const stats = await getCityChapters();
+  const statByCity = new Map(stats.map((s) => [s.city, s]));
+  const chapters = CITY_CHAPTERS.map((c) => {
+    const s = statByCity.get(c.city);
+    const nextEvent = s?.nextEventTitle
+      ? `${s.nextEventTitle} — ${s.nextEventDate ? new Date(s.nextEventDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""}`.trim()
+      : c.nextEvent;
+    return {
+      ...c,
+      events: s ? s.upcomingCount : c.events,
+      nextEvent,
+      active: c.active || (s ? s.upcomingCount > 0 : false),
+    };
+  });
+
   return (
     <div className="pt-24 bg-asphalt">
       <section className="section-pad">
@@ -89,7 +108,7 @@ export default function CommunityPage() {
 
           {/* City chapters */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-16">
-            {CITY_CHAPTERS.map((chapter) => (
+            {chapters.map((chapter) => (
               <div key={chapter.city}>
                 {chapter.active ? (
                   <Link

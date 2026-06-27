@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { createOrder, PRICES } from "@/lib/razorpay";
 import { db } from "@/lib/db";
-import { assessmentBookings, programBookings, programs } from "@/lib/db/schema";
+import { assessmentBookings, programBookings, programs, events, eventRegistrations } from "@/lib/db/schema";
 import { getProgramBySlug } from "@/lib/utils";
 import { upsertLeadFromContact } from "@/lib/portal/leads";
+import { getSession } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   try {
@@ -122,6 +123,64 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid gift type" }, { status: 400 });
       }
       receipt = `gift_${Date.now()}`;
+    } else if (type === "event") {
+      // Event registration is login-gated (eventRegistrations.userId is required).
+      const sessionUser = await getSession();
+      if (!sessionUser) {
+        return NextResponse.json({ error: "Please sign in to register for events." }, { status: 401 });
+      }
+      const evRows = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.slug, body.eventSlug), eq(events.isPublished, true)))
+        .limit(1);
+      const ev = evRows[0];
+      if (!ev) {
+        return NextResponse.json({ error: "Unknown event" }, { status: 400 });
+      }
+      amount = ev.price ?? 0;
+      if (amount <= 0) {
+        return NextResponse.json({ error: "This is a free event — RSVP from your dashboard." }, { status: 400 });
+      }
+      receipt = `evt_${Date.now()}`;
+      notes = {
+        type: "event",
+        eventSlug: ev.slug,
+        customerName: sessionUser.name,
+        customerEmail: sessionUser.email,
+        city: ev.city,
+      };
+
+      // Already registered? Don't double-charge.
+      const existing = await db
+        .select({ id: eventRegistrations.id, status: eventRegistrations.status })
+        .from(eventRegistrations)
+        .where(and(eq(eventRegistrations.userId, sessionUser.id), eq(eventRegistrations.eventId, ev.id)))
+        .limit(1);
+      if (existing[0]?.status === "confirmed") {
+        return NextResponse.json({ error: "You're already registered for this event." }, { status: 400 });
+      }
+
+      // Capacity guard against confirmed registrations.
+      const [reg] = await db
+        .select({ c: count() })
+        .from(eventRegistrations)
+        .where(and(eq(eventRegistrations.eventId, ev.id), eq(eventRegistrations.status, "confirmed")));
+      if ((reg?.c ?? 0) >= ev.capacity) {
+        return NextResponse.json({ error: "This event is full." }, { status: 400 });
+      }
+
+      // Hold a pending registration (unique on user+event); reuse if a prior attempt exists.
+      if (existing[0]) {
+        await db
+          .update(eventRegistrations)
+          .set({ amount, status: "pending" })
+          .where(eq(eventRegistrations.id, existing[0].id));
+      } else {
+        await db
+          .insert(eventRegistrations)
+          .values({ userId: sessionUser.id, eventId: ev.id, amount, status: "pending" });
+      }
     } else {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
@@ -141,7 +200,9 @@ export async function POST(req: NextRequest) {
             ? "program-booking"
             : type === "membership"
               ? "membership"
-              : "gift",
+              : type === "event"
+                ? "event"
+                : "gift",
     });
 
     const order = await createOrder(amount, receipt, notes);

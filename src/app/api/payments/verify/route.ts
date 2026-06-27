@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPaymentSignature } from "@/lib/razorpay";
 import { db } from "@/lib/db";
-import { assessmentBookings, programBookings } from "@/lib/db/schema";
+import { assessmentBookings, programBookings, eventRegistrations, events, users } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { sendWhatsAppNotification } from "@/lib/whatsapp";
 import { markLeadConverted } from "@/lib/portal/leads";
@@ -40,7 +40,9 @@ export async function POST(req: NextRequest) {
             ? "Program seat reserved"
             : type === "gift"
               ? "Gift sent"
-              : "Assessment confirmed",
+              : type === "event"
+                ? "You're registered"
+                : "Assessment confirmed",
       body: "Payment received — check your dashboard for details.",
       link: "/dashboard",
     });
@@ -95,6 +97,29 @@ export async function POST(req: NextRequest) {
           `We'll confirm your schedule and instructor within 24 hours. ` +
           `Earn the Road. — SteerClub Team`
         );
+      }
+    } else if (type === "event") {
+      // Confirm the pending registration for this user + event.
+      if (bookingData?.email && bookingData?.eventSlug) {
+        const email = bookingData.email.toLowerCase().trim();
+        const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+        const [ev] = await db.select({ id: events.id }).from(events).where(eq(events.slug, bookingData.eventSlug)).limit(1);
+        if (u && ev) {
+          await db
+            .update(eventRegistrations)
+            .set({
+              status: "confirmed",
+              razorpayOrderId: razorpay_order_id,
+              razorpayPaymentId: razorpay_payment_id,
+            })
+            .where(
+              and(
+                eq(eventRegistrations.userId, u.id),
+                eq(eventRegistrations.eventId, ev.id),
+                eq(eventRegistrations.status, "pending")
+              )
+            );
+        }
       }
     } else if (type === "membership" && bookingData?.phone) {
       const waNumber = process.env.WHATSAPP_BUSINESS_NUMBER ?? "";
