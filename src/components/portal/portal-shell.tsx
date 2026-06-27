@@ -11,6 +11,7 @@ import {
   CreditCard,
   Trophy,
   Users,
+  Gift,
   User,
   Bell,
   LogOut,
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/dashboard/community", label: "Community", icon: Users },
   { href: "/dashboard/payments", label: "Payments", icon: CreditCard },
   { href: "/dashboard/achievements", label: "Achievements", icon: Trophy },
+  { href: "/dashboard/refer", label: "Refer & Earn", icon: Gift },
   { href: "/dashboard/profile", label: "Profile", icon: User },
 ];
 

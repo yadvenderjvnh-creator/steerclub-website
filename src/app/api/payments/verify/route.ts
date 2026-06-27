@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
       buyerEmail: bookingData?.buyerEmail,
       recipientName: bookingData?.recipientName,
       recipientEmail: bookingData?.recipientEmail,
+      couponCode: body.couponCode,
+      couponDiscount: body.couponDiscount,
     });
 
     // Optional WhatsApp confirmations (only when the Business number is configured).

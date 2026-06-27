@@ -7,6 +7,7 @@ import { z } from "zod";
 import { CheckCircle2, Lock, Users, RotateCcw } from "lucide-react";
 import { CITIES, formatINR } from "@/lib/utils";
 import { buildWhatsAppLink, WA_MESSAGES } from "@/lib/whatsapp";
+import { CouponField, type AppliedCoupon } from "@/components/checkout/coupon-field";
 import type { Program } from "@/types";
 
 const bookingSchema = z.object({
@@ -34,6 +35,10 @@ export default function ProgramBookingClient({ program }: { program: Program }) 
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bookingData, setBookingData] = useState<BookingForm | null>(null);
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+  const [referralCode] = useState<string | undefined>(() =>
+    typeof window === "undefined" ? undefined : new URLSearchParams(window.location.search).get("ref") ?? undefined
+  );
 
   const {
     register,
@@ -61,6 +66,8 @@ export default function ProgramBookingClient({ program }: { program: Program }) 
           programSlug: program.slug,
           isMember: data.isMember,
           customerData: data,
+          couponCode: coupon?.code,
+          referralCode,
         }),
       });
       const { orderId, amount, currency } = await res.json();
@@ -92,6 +99,8 @@ export default function ProgramBookingClient({ program }: { program: Program }) 
                 type: "program",
                 programSlug: program.slug,
                 bookingData: data,
+                couponCode: coupon?.code,
+                couponDiscount: coupon?.discount,
               }),
             });
             if (verify.ok) setConfirmed(true);
@@ -279,6 +288,15 @@ export default function ProgramBookingClient({ program }: { program: Program }) 
               />
             </div>
 
+            {/* Coupon */}
+            <CouponField
+              source="program"
+              amount={activePrice}
+              applied={coupon}
+              onApply={setCoupon}
+              onClear={() => setCoupon(null)}
+            />
+
             {/* Price summary */}
             <div className="glass rounded-xl p-5 flex items-center justify-between">
               <div>
@@ -288,17 +306,16 @@ export default function ProgramBookingClient({ program }: { program: Program }) 
                 </p>
               </div>
               <div className="text-right">
-                {isMember && (
+                {(isMember || coupon) && (
                   <p className="text-xs text-steel font-ui line-through">
-                    {formatINR(program.price)}
+                    {formatINR(coupon ? activePrice : program.price)}
                   </p>
                 )}
                 <p className="font-heading font-black text-2xl text-white">
-                  {formatINR(activePrice)}
+                  {formatINR(coupon ? coupon.finalAmount : activePrice)}
                 </p>
-                {isMember && (
-                  <p className="text-xs text-lime font-ui">Member price</p>
-                )}
+                {isMember && !coupon && <p className="text-xs text-lime font-ui">Member price</p>}
+                {coupon && <p className="text-xs text-lime font-ui">Coupon {coupon.code} applied</p>}
               </div>
             </div>
 
@@ -307,7 +324,7 @@ export default function ProgramBookingClient({ program }: { program: Program }) 
               disabled={loading}
               className="w-full bg-lime text-asphalt font-heading font-black text-base tracking-wide uppercase py-5 hover:bg-lime/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? "Processing..." : `Proceed to Payment — ${formatINR(activePrice)}`}
+              {loading ? "Processing..." : `Proceed to Payment — ${formatINR(coupon ? coupon.finalAmount : activePrice)}`}
             </button>
 
             <p className="text-center text-xs text-steel font-ui">

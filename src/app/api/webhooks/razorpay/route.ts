@@ -70,6 +70,8 @@ export async function POST(req: Request) {
       buyerEmail: notes.buyerEmail,
       recipientName: notes.recipientName,
       recipientEmail: notes.recipientEmail,
+      couponCode: notes.couponCode,
+      couponDiscount: notes.couponDiscount ? Number(notes.couponDiscount) : null,
     });
   } catch (err) {
     console.error("razorpay webhook confirm failed:", err);

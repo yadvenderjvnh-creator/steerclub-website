@@ -4,6 +4,8 @@ import { assessmentBookings, programBookings, eventRegistrations, events, users 
 import { markLeadConverted } from "@/lib/portal/leads";
 import { notifyUserByEmail } from "@/lib/portal/notify";
 import { persistMembership, persistGift, membershipAmount } from "./persist";
+import { recordCouponRedemption } from "./coupons";
+import { qualifyReferral } from "./referrals";
 import { ensureInvoice } from "@/lib/billing/invoices";
 import { getProgramBySlug } from "@/lib/utils";
 
@@ -23,7 +25,23 @@ export type ConfirmParams = {
   buyerEmail?: string | null;
   recipientName?: string | null;
   recipientEmail?: string | null;
+  couponCode?: string | null;
+  couponDiscount?: number | null;
 };
+
+/** Record a coupon redemption + qualify any referral for a confirmed booking. */
+async function recordGrowth(p: ConfirmParams, source: string, bookingId: string, email?: string | null) {
+  if (p.couponCode) {
+    await recordCouponRedemption({
+      code: p.couponCode,
+      source,
+      bookingId,
+      email,
+      amountDiscounted: p.couponDiscount ?? 0,
+    });
+  }
+  await qualifyReferral(email ?? null, source, bookingId);
+}
 
 const NOTIF_TITLE: Record<string, string> = {
   membership: "Membership active",
@@ -61,6 +79,7 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
         .returning({ id: assessmentBookings.id, amount: assessmentBookings.amount });
       if (updated[0]) {
         await ensureInvoice({ source: "assessment", bookingId: updated[0].id, email: p.email, item: "Steer Score Assessment", amount: updated[0].amount });
+        await recordGrowth(p, "assessment", updated[0].id, p.email);
       }
     }
   } else if (p.type === "program") {
@@ -77,6 +96,7 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
           .set({ status: "confirmed", razorpayOrderId: p.orderId ?? undefined, razorpayPaymentId: p.paymentId })
           .where(eq(programBookings.id, pending.id));
         await ensureInvoice({ source: "program", bookingId: pending.id, email: p.email, item: "SteerClub Program", amount: pending.amount });
+        await recordGrowth(p, "program", pending.id, p.email);
       }
     }
   } else if (p.type === "event") {
@@ -98,6 +118,7 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
           .returning({ id: eventRegistrations.id, amount: eventRegistrations.amount });
         if (updated[0] && (updated[0].amount ?? 0) > 0) {
           await ensureInvoice({ source: "event", bookingId: updated[0].id, email, userId: u.id, item: ev.title, amount: updated[0].amount ?? 0 });
+          await recordGrowth(p, "event", updated[0].id, email);
         }
       }
     }
@@ -113,6 +134,7 @@ export async function confirmPaidBooking(p: ConfirmParams): Promise<void> {
       });
       if (m) {
         await ensureInvoice({ source: "membership", bookingId: m.id, email: p.email, userId: m.userId, item: `SteerClub Membership — ${p.tier}`, amount: m.amount });
+        await recordGrowth(p, "membership", m.id, p.email);
       }
     }
   } else if (p.type === "gift") {
