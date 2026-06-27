@@ -460,6 +460,41 @@ export const invoices = pgTable("invoices", {
   uniqSourceBooking: unique().on(t.source, t.bookingId),
 }));
 
+// Marketing campaigns (email now; whatsapp/push scaffolded).
+export const campaigns = pgTable("campaigns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  channel: varchar("channel", { length: 10 }).default("email").notNull(), // email|whatsapp|push
+  segment: varchar("segment", { length: 60 }).notNull(), // segment key (see lib/marketing/segments)
+  subject: varchar("subject", { length: 255 }),
+  body: text("body").notNull(),
+  status: varchar("status", { length: 12 }).default("draft").notNull(), // draft|scheduled|sending|sent
+  scheduledAt: timestamp("scheduled_at"),
+  sentAt: timestamp("sent_at"),
+  stats: jsonb("stats").$type<{ recipients: number; sent: number; failed: number }>(),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const campaignRecipients = pgTable("campaign_recipients", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  email: varchar("email", { length: 255 }).notNull(),
+  status: varchar("status", { length: 10 }).default("pending").notNull(), // pending|sent|failed
+  sentAt: timestamp("sent_at"),
+});
+
+// Generic idempotency ledger for lifecycle automations (one row per (type, refId)).
+export const automationLog = pgTable("automation_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  type: varchar("type", { length: 40 }).notNull(),
+  refId: varchar("ref_id", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniqTypeRef: unique().on(t.type, t.refId),
+}));
+
 // Discount coupons applied at checkout.
 export const coupons = pgTable("coupons", {
   id: uuid("id").primaryKey().defaultRandom(),

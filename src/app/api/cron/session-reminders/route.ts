@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { programSessions, cohorts, programs, programBookings, instructors, events, eventRegistrations, users } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email";
 import { notifyUserByEmail } from "@/lib/portal/notify";
+import { dispatchDueCampaigns } from "@/lib/marketing/dispatch";
+import { runLifecycleAutomations } from "@/lib/marketing/automations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,5 +119,17 @@ export async function GET(req: Request) {
     eventEmails += 1;
   }
 
-  return Response.json({ ok: true, sessions: sessions.length, emails, events: eventRegs.length, eventEmails });
+  // ---- Marketing: dispatch due campaigns + lifecycle automations ----
+  const campaignsSent = await dispatchDueCampaigns();
+  const lifecycle = await runLifecycleAutomations();
+
+  return Response.json({
+    ok: true,
+    sessions: sessions.length,
+    emails,
+    events: eventRegs.length,
+    eventEmails,
+    campaignsSent,
+    lifecycle,
+  });
 }
