@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { createOrder, PRICES } from "@/lib/razorpay";
 import { db } from "@/lib/db";
-import { assessmentBookings } from "@/lib/db/schema";
+import { assessmentBookings, programBookings, programs } from "@/lib/db/schema";
 import { getProgramBySlug } from "@/lib/utils";
 import { upsertLeadFromContact } from "@/lib/portal/leads";
 
@@ -51,6 +52,25 @@ export async function POST(req: NextRequest) {
         customerEmail: customerData.email,
         city: customerData.city,
       };
+
+      // Persist a pending enrollment (resolve the seeded program row by slug).
+      const progRows = await db
+        .select({ id: programs.id })
+        .from(programs)
+        .where(eq(programs.slug, program.slug))
+        .limit(1);
+      if (progRows[0]) {
+        await db.insert(programBookings).values({
+          programId: progRows[0].id,
+          name: customerData.name,
+          email: customerData.email,
+          phone: customerData.phone,
+          city: customerData.city,
+          amount,
+          isMemberPrice: Boolean(isMember),
+          status: "pending",
+        });
+      }
     } else if (type === "membership") {
       const membershipAmount = membershipPrice(tier, billing);
       if (membershipAmount === null) {

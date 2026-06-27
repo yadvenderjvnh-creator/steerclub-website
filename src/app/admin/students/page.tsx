@@ -2,10 +2,12 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, assessmentBookings } from "@/lib/db/schema";
 import { StudentsTable, type StudentRow } from "./students-table";
+import { requireRole } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentsPage() {
+  await requireRole(["admin"]);
   const [clientUsers, bookings] = await Promise.all([
     db.select().from(users).where(eq(users.role, "client")).orderBy(desc(users.createdAt)),
     db

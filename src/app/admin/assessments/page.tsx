@@ -2,10 +2,12 @@ import { desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { steerScores } from "@/lib/db/schema";
 import { AssessmentManager, type ScoreRow } from "./assessment-manager";
+import { requireRole } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function AssessmentsPage() {
+  await requireRole(["admin"]);
   const scores = await db
     .select({
       id: steerScores.id,

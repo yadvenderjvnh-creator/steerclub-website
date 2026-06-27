@@ -84,7 +84,10 @@ export async function requireRole(
 ): Promise<SessionUser> {
   const user = await getSession();
   if (!user) redirect(`/sign-in${next ? `?next=${encodeURIComponent(next)}` : ""}`);
-  if (!roles.includes(user.role)) redirect("/dashboard");
+  if (!roles.includes(user.role)) {
+    // Route a role mismatch somewhere sensible for that role.
+    redirect(user.role === "coach" ? "/admin/coach" : "/dashboard");
+  }
   return user;
 }
 

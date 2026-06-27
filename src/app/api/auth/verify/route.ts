@@ -66,6 +66,7 @@ export async function GET(req: NextRequest) {
 
   // Safe redirect: only allow same-site relative paths from `next`.
   const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
-  const dest = safeNext ?? (role === "admin" || role === "coach" ? "/admin" : "/dashboard");
+  const roleHome = role === "admin" ? "/admin" : role === "coach" ? "/admin/coach" : "/dashboard";
+  const dest = safeNext ?? roleHome;
   return NextResponse.redirect(`${origin}${dest}`);
 }

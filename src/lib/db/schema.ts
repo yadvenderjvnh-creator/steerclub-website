@@ -8,6 +8,7 @@ import {
   uuid,
   varchar,
   pgEnum,
+  unique,
 } from "drizzle-orm/pg-core";
 
 export const cityEnum = pgEnum("city", [
@@ -36,6 +37,14 @@ export const userRoleEnum = pgEnum("user_role", [
 
 export const leadStatusEnum = pgEnum("lead_status", [
   "new", "contacted", "qualified", "converted", "lost",
+]);
+
+export const sessionStatusEnum = pgEnum("session_status", [
+  "scheduled", "completed", "cancelled",
+]);
+
+export const attendanceStatusEnum = pgEnum("attendance_status", [
+  "present", "absent", "late", "excused",
 ]);
 
 export const users = pgTable("users", {
@@ -252,15 +261,68 @@ export const blogPosts = pgTable("blog_posts", {
 
 export const instructors = pgTable("instructors", {
   id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }), // coach login link
+  email: varchar("email", { length: 255 }),
   name: varchar("name", { length: 255 }).notNull(),
   bio: text("bio").notNull(),
   photo: text("photo"),
   city: cityEnum("city").notNull(),
   specialties: jsonb("specialties").$type<string[]>(),
   kmDriven: varchar("km_driven", { length: 50 }),
+  ratePerSession: integer("rate_per_session").default(0), // paise, for payroll
   certifiedAt: timestamp("certified_at"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const coachAvailability = pgTable("coach_availability", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  instructorId: uuid("instructor_id").notNull().references(() => instructors.id, { onDelete: "cascade" }),
+  weekday: integer("weekday").notNull(), // 0=Sun … 6=Sat
+  startTime: varchar("start_time", { length: 5 }).notNull(), // "HH:MM"
+  endTime: varchar("end_time", { length: 5 }).notNull(),
+});
+
+export const programSessions = pgTable("program_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cohortId: uuid("cohort_id").notNull().references(() => cohorts.id, { onDelete: "cascade" }),
+  sessionNo: integer("session_no").notNull(),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  durationMins: integer("duration_mins").default(120).notNull(),
+  instructorId: uuid("instructor_id").references(() => instructors.id),
+  location: varchar("location", { length: 255 }),
+  status: sessionStatusEnum("status").default("scheduled").notNull(),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const attendance = pgTable("attendance", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").notNull().references(() => programSessions.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: attendanceStatusEnum("status").notNull(),
+  markedById: uuid("marked_by_id").references(() => users.id),
+  markedAt: timestamp("marked_at").defaultNow().notNull(),
+}, (t) => ({
+  uniqSessionUser: unique().on(t.sessionId, t.userId),
+}));
+
+export const sessionFeedback = pgTable("session_feedback", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").notNull().references(() => programSessions.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  instructorId: uuid("instructor_id").references(() => instructors.id),
+  notes: text("notes"),
+  skillRatings: jsonb("skill_ratings").$type<Record<string, number>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const certificates = pgTable("certificates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  programId: uuid("program_id").notNull().references(() => programs.id),
+  serial: varchar("serial", { length: 40 }).notNull().unique(),
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
 });
 
 export const waitlist = pgTable("waitlist", {

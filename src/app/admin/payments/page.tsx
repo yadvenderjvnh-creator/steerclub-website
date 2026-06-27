@@ -5,12 +5,14 @@ import { assessmentBookings, programBookings, programs } from "@/lib/db/schema";
 import { StatCard } from "@/components/admin/stat-card";
 import { formatINR } from "@/lib/utils";
 import { PaymentsTable, type PaymentRow } from "./payments-table";
+import { requireRole } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 const PAID = ["confirmed", "completed"] as const;
 
 export default async function PaymentsPage() {
+  await requireRole(["admin"]);
   const [asmt, progs] = await Promise.all([
     db.select().from(assessmentBookings).orderBy(desc(assessmentBookings.createdAt)),
     db

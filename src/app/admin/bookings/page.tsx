@@ -2,10 +2,12 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { assessmentBookings, programBookings, programs } from "@/lib/db/schema";
 import { BookingsTable, type BookingRow } from "./bookings-table";
+import { requireRole } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function BookingsPage() {
+  await requireRole(["admin"]);
   const [asmt, progs] = await Promise.all([
     db.select().from(assessmentBookings).orderBy(desc(assessmentBookings.createdAt)),
     db

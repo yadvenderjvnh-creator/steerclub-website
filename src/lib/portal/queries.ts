@@ -8,6 +8,12 @@ import {
   notifications,
   programs,
   users,
+  cohorts,
+  programSessions,
+  attendance,
+  sessionFeedback,
+  certificates,
+  events,
 } from "@/lib/db/schema";
 
 export type PortalUser = { id: string; email: string };
@@ -77,6 +83,55 @@ export async function getUserPayments(user: PortalUser) {
     })),
   ];
   return rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/** Sessions for cohorts the user is enrolled in (joined to program + the user's own attendance/feedback). */
+export async function getUserSessions(user: PortalUser) {
+  return db
+    .select({
+      id: programSessions.id,
+      sessionNo: programSessions.sessionNo,
+      scheduledAt: programSessions.scheduledAt,
+      status: programSessions.status,
+      location: programSessions.location,
+      programName: programs.name,
+      city: cohorts.city,
+      attendanceStatus: attendance.status,
+      feedback: sessionFeedback.notes,
+    })
+    .from(programSessions)
+    .innerJoin(cohorts, eq(programSessions.cohortId, cohorts.id))
+    .innerJoin(programs, eq(cohorts.programId, programs.id))
+    .innerJoin(
+      programBookings,
+      and(
+        eq(programBookings.cohortId, cohorts.id),
+        or(eq(programBookings.userId, user.id), emailMatch(programBookings.email, user.email))
+      )
+    )
+    .leftJoin(attendance, and(eq(attendance.sessionId, programSessions.id), eq(attendance.userId, user.id)))
+    .leftJoin(sessionFeedback, and(eq(sessionFeedback.sessionId, programSessions.id), eq(sessionFeedback.userId, user.id)))
+    .orderBy(programSessions.scheduledAt);
+}
+
+/** Certificates earned by the user (joined to program name). */
+export async function getUserCertificates(user: PortalUser) {
+  return db
+    .select({ id: certificates.id, serial: certificates.serial, issuedAt: certificates.issuedAt, programId: certificates.programId, programName: programs.name })
+    .from(certificates)
+    .innerJoin(programs, eq(certificates.programId, programs.id))
+    .where(eq(certificates.userId, user.id))
+    .orderBy(desc(certificates.issuedAt));
+}
+
+/** Published upcoming events (for the calendar). */
+export async function getUpcomingEvents() {
+  return db
+    .select({ id: events.id, title: events.title, eventDate: events.eventDate, location: events.location, city: events.city, type: events.type })
+    .from(events)
+    .where(and(eq(events.isPublished, true), sql`${events.eventDate} >= now()`))
+    .orderBy(events.eventDate)
+    .limit(20);
 }
 
 export async function getMembership(userId: string) {

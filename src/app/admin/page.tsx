@@ -18,6 +18,7 @@ import {
 } from "@/lib/db/schema";
 import { StatCard } from "@/components/admin/stat-card";
 import { formatINR } from "@/lib/utils";
+import { requireRole } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ async function pendingAmount(table: typeof assessmentBookings | typeof programBo
 }
 
 export default async function AdminDashboard() {
+  await requireRole(["admin"]);
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);

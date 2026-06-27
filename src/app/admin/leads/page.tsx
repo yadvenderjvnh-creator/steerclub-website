@@ -2,10 +2,12 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, waitlist, leadActivities, users } from "@/lib/db/schema";
 import { LeadsManager, type LeadRow, type WaitlistRow } from "./leads-manager";
+import { requireRole } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function LeadsPage() {
+  await requireRole(["admin"]);
   const [leadRows, waitlistRows, activities] = await Promise.all([
     db
       .select({

@@ -9,17 +9,25 @@ import {
   GraduationCap,
   ClipboardList,
   CreditCard,
+  BookOpen,
+  UserCog,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV = [
+const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
   { href: "/admin/students", label: "Students", icon: GraduationCap },
   { href: "/admin/assessments", label: "Assessments", icon: ClipboardList },
+  { href: "/admin/programs", label: "Programs", icon: BookOpen },
+  { href: "/admin/coaches", label: "Coaches", icon: UserCog },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
+];
+
+const COACH_NAV = [
+  { href: "/admin/coach", label: "My Sessions", icon: CalendarCheck, exact: true },
 ];
 
 export function AdminShell({
@@ -30,6 +38,7 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const NAV = user.role === "coach" ? COACH_NAV : ADMIN_NAV;
 
   const navLinks = NAV.map(({ href, label, icon: Icon, exact }) => {
     const active = exact ? pathname === href : pathname.startsWith(href);

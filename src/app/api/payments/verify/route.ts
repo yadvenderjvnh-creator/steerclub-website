@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPaymentSignature } from "@/lib/razorpay";
 import { db } from "@/lib/db";
-import { assessmentBookings } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { assessmentBookings, programBookings } from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { sendWhatsAppNotification } from "@/lib/whatsapp";
 import { markLeadConverted } from "@/lib/portal/leads";
 import { notifyUserByEmail } from "@/lib/portal/notify";
@@ -66,7 +66,26 @@ export async function POST(req: NextRequest) {
           `Earn the Road. — SteerClub Team`
         );
       }
-    } else if (type === "program" && bookingData?.phone) {
+    } else if (type === "program") {
+      // Confirm the newest pending enrollment for this email.
+      if (bookingData?.email) {
+        const pending = await db
+          .select({ id: programBookings.id })
+          .from(programBookings)
+          .where(and(eq(programBookings.email, bookingData.email), eq(programBookings.status, "pending")))
+          .orderBy(desc(programBookings.createdAt))
+          .limit(1);
+        if (pending[0]) {
+          await db
+            .update(programBookings)
+            .set({
+              status: "confirmed",
+              razorpayOrderId: razorpay_order_id,
+              razorpayPaymentId: razorpay_payment_id,
+            })
+            .where(eq(programBookings.id, pending[0].id));
+        }
+      }
       const waNumber = process.env.WHATSAPP_BUSINESS_NUMBER ?? "";
       if (waNumber) {
         await sendWhatsAppNotification(
