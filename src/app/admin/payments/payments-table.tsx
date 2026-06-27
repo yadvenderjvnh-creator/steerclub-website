@@ -3,9 +3,11 @@
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { formatINR } from "@/lib/utils";
+import { RefundButton } from "./refund-button";
 
 export type PaymentRow = {
   id: string;
+  source: string;
   item: string;
   name: string;
   email: string;
@@ -35,6 +37,12 @@ export function PaymentsTable({ rows }: { rows: PaymentRow[] }) {
       ),
     },
     { key: "item", header: "Item", value: (r) => r.item },
+    {
+      key: "source",
+      header: "Type",
+      value: (r) => r.source,
+      render: (r) => <span className="text-xs font-ui uppercase tracking-wide text-steel">{r.source}</span>,
+    },
     { key: "amount", header: "Amount", value: (r) => r.amount, render: (r) => formatINR(r.amount) },
     {
       key: "paymentId",
@@ -43,6 +51,7 @@ export function PaymentsTable({ rows }: { rows: PaymentRow[] }) {
       render: (r) => <span className="text-xs font-mono text-steel">{r.paymentId ?? "—"}</span>,
     },
     { key: "status", header: "Status", value: (r) => r.status, render: (r) => <StatusBadge status={r.status} /> },
+    { key: "refund", header: "", value: () => "", render: (r) => <RefundButton row={r} /> },
   ];
 
   return (

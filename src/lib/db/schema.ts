@@ -211,6 +211,8 @@ export const memberships = pgTable("memberships", {
   endDate: timestamp("end_date"),
   razorpaySubscriptionId: text("razorpay_subscription_id"),
   razorpayCustomerId: text("razorpay_customer_id"),
+  razorpayPaymentId: text("razorpay_payment_id"),
+  amount: integer("amount"), // paise paid for this term (for revenue reporting)
   isAnnual: boolean("is_annual").default(false),
   cancelledAt: timestamp("cancelled_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -411,5 +413,40 @@ export const galleryPhotos = pgTable("gallery_photos", {
   city: cityEnum("city"),
   uploadedById: uuid("uploaded_by_id").references(() => users.id),
   approved: boolean("approved").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ---------- Phase 5: Growth (finance) ----------
+// `source` is the booking table a finance row points at (polymorphic, no FK):
+//   "assessment" | "program" | "event" | "membership" | "gift".
+
+// Razorpay refunds against a paid booking.
+export const refunds = pgTable("refunds", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  source: varchar("source", { length: 20 }).notNull(),
+  bookingId: uuid("booking_id"),
+  paymentId: text("payment_id"),
+  amount: integer("amount").notNull(), // paise
+  reason: text("reason"),
+  status: varchar("status", { length: 20 }).default("processed").notNull(), // processed | failed | pending
+  razorpayRefundId: text("razorpay_refund_id"),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Gift purchases (membership or program), redeemable by a recipient via code.
+export const giftPurchases = pgTable("gift_purchases", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  type: varchar("type", { length: 20 }).notNull(), // membership | program
+  refId: varchar("ref_id", { length: 100 }), // tier or program slug
+  amount: integer("amount").notNull(),
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  buyerName: varchar("buyer_name", { length: 255 }),
+  buyerEmail: varchar("buyer_email", { length: 255 }),
+  recipientName: varchar("recipient_name", { length: 255 }),
+  recipientEmail: varchar("recipient_email", { length: 255 }),
+  razorpayPaymentId: text("razorpay_payment_id"),
+  redeemedByUserId: uuid("redeemed_by_user_id").references(() => users.id),
+  redeemedAt: timestamp("redeemed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

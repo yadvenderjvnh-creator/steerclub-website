@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPaymentSignature } from "@/lib/razorpay";
-import { db } from "@/lib/db";
-import { assessmentBookings, programBookings, eventRegistrations, events, users } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
 import { sendWhatsAppNotification } from "@/lib/whatsapp";
-import { markLeadConverted } from "@/lib/portal/leads";
-import { notifyUserByEmail } from "@/lib/portal/notify";
+import { confirmPaidBooking } from "@/lib/finance/confirm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,110 +24,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     }
 
-    // A paid booker is a converted lead.
-    const payerEmail = type === "gift" ? bookingData?.buyerEmail : bookingData?.email;
-    await markLeadConverted(payerEmail);
-    await notifyUserByEmail(payerEmail, {
-      type: "booking",
-      title:
-        type === "membership"
-          ? "Membership active"
-          : type === "program"
-            ? "Program seat reserved"
-            : type === "gift"
-              ? "Gift sent"
-              : type === "event"
-                ? "You're registered"
-                : "Assessment confirmed",
-      body: "Payment received — check your dashboard for details.",
-      link: "/dashboard",
+    // Single source of truth — shared with the Razorpay webhook fallback.
+    await confirmPaidBooking({
+      type,
+      paymentId: razorpay_payment_id,
+      orderId: razorpay_order_id,
+      email: bookingData?.email,
+      name: bookingData?.name,
+      phone: bookingData?.phone,
+      tier: body.tier,
+      billing: body.billing,
+      giftType: body.giftType,
+      programSlug: body.programSlug,
+      eventSlug: bookingData?.eventSlug,
+      buyerName: bookingData?.buyerName,
+      buyerEmail: bookingData?.buyerEmail,
+      recipientName: bookingData?.recipientName,
+      recipientEmail: bookingData?.recipientEmail,
     });
 
-    if (type === "assessment") {
-      await db
-        .update(assessmentBookings)
-        .set({
-          status: "confirmed",
-          razorpayOrderId: razorpay_order_id,
-          razorpayPaymentId: razorpay_payment_id,
-          confirmedAt: new Date(),
-        })
-        .where(eq(assessmentBookings.email, bookingData.email));
-
-      const waNumber = process.env.WHATSAPP_BUSINESS_NUMBER ?? "";
-      if (waNumber) {
-        await sendWhatsAppNotification(
-          bookingData.phone,
-          `Hi ${bookingData.name}! Your SteerClub assessment is confirmed. ` +
-          `Payment ID: ${razorpay_payment_id}. ` +
-          `We'll contact you within 2 hours to confirm your instructor and session details. ` +
-          `Earn the Road. — SteerClub Team`
-        );
-      }
-    } else if (type === "program") {
-      // Confirm the newest pending enrollment for this email.
-      if (bookingData?.email) {
-        const pending = await db
-          .select({ id: programBookings.id })
-          .from(programBookings)
-          .where(and(eq(programBookings.email, bookingData.email), eq(programBookings.status, "pending")))
-          .orderBy(desc(programBookings.createdAt))
-          .limit(1);
-        if (pending[0]) {
-          await db
-            .update(programBookings)
-            .set({
-              status: "confirmed",
-              razorpayOrderId: razorpay_order_id,
-              razorpayPaymentId: razorpay_payment_id,
-            })
-            .where(eq(programBookings.id, pending[0].id));
-        }
-      }
-      const waNumber = process.env.WHATSAPP_BUSINESS_NUMBER ?? "";
-      if (waNumber) {
-        await sendWhatsAppNotification(
-          bookingData.phone,
-          `Hi ${bookingData.name}! Your seat in the next SteerClub cohort is reserved. ` +
-          `Payment ID: ${razorpay_payment_id}. ` +
-          `We'll confirm your schedule and instructor within 24 hours. ` +
-          `Earn the Road. — SteerClub Team`
-        );
-      }
-    } else if (type === "event") {
-      // Confirm the pending registration for this user + event.
-      if (bookingData?.email && bookingData?.eventSlug) {
-        const email = bookingData.email.toLowerCase().trim();
-        const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-        const [ev] = await db.select({ id: events.id }).from(events).where(eq(events.slug, bookingData.eventSlug)).limit(1);
-        if (u && ev) {
-          await db
-            .update(eventRegistrations)
-            .set({
-              status: "confirmed",
-              razorpayOrderId: razorpay_order_id,
-              razorpayPaymentId: razorpay_payment_id,
-            })
-            .where(
-              and(
-                eq(eventRegistrations.userId, u.id),
-                eq(eventRegistrations.eventId, ev.id),
-                eq(eventRegistrations.status, "pending")
-              )
-            );
-        }
-      }
-    } else if (type === "membership" && bookingData?.phone) {
-      const waNumber = process.env.WHATSAPP_BUSINESS_NUMBER ?? "";
-      if (waNumber) {
-        await sendWhatsAppNotification(
-          bookingData.phone,
-          `Hi ${bookingData.name}! Welcome to SteerClub. Your membership is active. ` +
-          `Payment ID: ${razorpay_payment_id}. ` +
-          `Member pricing now applies to every program you book. ` +
-          `Earn the Road. — SteerClub Team`
-        );
-      }
+    // Optional WhatsApp confirmations (only when the Business number is configured).
+    const waNumber = process.env.WHATSAPP_BUSINESS_NUMBER ?? "";
+    if (waNumber && bookingData?.phone) {
+      const msg =
+        type === "assessment"
+          ? `Hi ${bookingData.name}! Your SteerClub assessment is confirmed. Payment ID: ${razorpay_payment_id}. We'll contact you within 2 hours to confirm your instructor and session details. Earn the Road. — SteerClub Team`
+          : type === "program"
+            ? `Hi ${bookingData.name}! Your seat in the next SteerClub cohort is reserved. Payment ID: ${razorpay_payment_id}. We'll confirm your schedule and instructor within 24 hours. Earn the Road. — SteerClub Team`
+            : type === "membership"
+              ? `Hi ${bookingData.name}! Welcome to SteerClub. Your membership is active. Payment ID: ${razorpay_payment_id}. Member pricing now applies to every program you book. Earn the Road. — SteerClub Team`
+              : null;
+      if (msg) await sendWhatsAppNotification(bookingData.phone, msg);
     }
 
     return NextResponse.json({ success: true });
