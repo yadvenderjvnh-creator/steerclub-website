@@ -6,11 +6,13 @@ import { assessmentBookings, programBookings, programs, events, eventRegistratio
 import { getProgramBySlug } from "@/lib/utils";
 import { upsertLeadFromContact } from "@/lib/portal/leads";
 import { getSession } from "@/lib/auth/session";
+import { maybeApplyCoupon } from "@/lib/finance/coupons";
+import { captureReferral } from "@/lib/finance/referrals";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { type, customerData, programSlug, isMember, tier, billing, giftType } = body;
+    const { type, customerData, programSlug, isMember, tier, billing, giftType, couponCode } = body;
 
     let amount: number;
     let receipt: string;
@@ -18,12 +20,15 @@ export async function POST(req: NextRequest) {
 
     if (type === "assessment") {
       amount = PRICES.assessment;
+      const c = await maybeApplyCoupon(couponCode, "assessment", amount);
+      amount = c.amount;
       receipt = `asmt_${Date.now()}`;
       notes = {
         type: "assessment",
         customerName: customerData.name,
         customerEmail: customerData.email,
         city: customerData.city,
+        ...(c.code ? { couponCode: c.code, couponDiscount: String(c.discount) } : {}),
       };
 
       await db.insert(assessmentBookings).values({
@@ -44,6 +49,8 @@ export async function POST(req: NextRequest) {
       }
       // Honor member pricing so the charge matches what the booking UI shows.
       amount = isMember ? program.memberPrice : program.price;
+      const c = await maybeApplyCoupon(couponCode, "program", amount);
+      amount = c.amount;
       receipt = `prog_${Date.now()}`;
       notes = {
         type: "program",
@@ -52,6 +59,7 @@ export async function POST(req: NextRequest) {
         customerName: customerData.name,
         customerEmail: customerData.email,
         city: customerData.city,
+        ...(c.code ? { couponCode: c.code, couponDiscount: String(c.discount) } : {}),
       };
 
       // Persist a pending enrollment (resolve the seeded program row by slug).
@@ -78,6 +86,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid membership tier" }, { status: 400 });
       }
       amount = membershipAmount;
+      const c = await maybeApplyCoupon(couponCode, "membership", amount);
+      amount = c.amount;
       receipt = `memb_${Date.now()}`;
       notes = {
         type: "membership",
@@ -86,6 +96,7 @@ export async function POST(req: NextRequest) {
         customerName: customerData.name,
         customerEmail: customerData.email,
         city: customerData.city ?? "",
+        ...(c.code ? { couponCode: c.code, couponDiscount: String(c.discount) } : {}),
       };
     } else if (type === "gift") {
       if (giftType === "membership") {
@@ -142,6 +153,8 @@ export async function POST(req: NextRequest) {
       if (amount <= 0) {
         return NextResponse.json({ error: "This is a free event — RSVP from your dashboard." }, { status: 400 });
       }
+      const c = await maybeApplyCoupon(couponCode, "event", amount);
+      amount = c.amount;
       receipt = `evt_${Date.now()}`;
       notes = {
         type: "event",
@@ -149,6 +162,7 @@ export async function POST(req: NextRequest) {
         customerName: sessionUser.name,
         customerEmail: sessionUser.email,
         city: ev.city,
+        ...(c.code ? { couponCode: c.code, couponDiscount: String(c.discount) } : {}),
       };
 
       // Already registered? Don't double-charge.
@@ -204,6 +218,10 @@ export async function POST(req: NextRequest) {
                 ? "event"
                 : "gift",
     });
+
+    // Capture a pending referral when a friend checks out with a ?ref code.
+    const referredEmail = isGift ? customerData?.buyerEmail : customerData?.email;
+    await captureReferral(body.referralCode, referredEmail, type);
 
     const order = await createOrder(amount, receipt, notes);
 

@@ -12,6 +12,7 @@ import {
   BookOpen,
   UserCog,
   PartyPopper,
+  Megaphone,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ const ADMIN_NAV = [
   { href: "/admin/coaches", label: "Coaches", icon: UserCog },
   { href: "/admin/community", label: "Community", icon: PartyPopper },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
+  { href: "/admin/marketing", label: "Marketing", icon: Megaphone },
 ];
 
 const COACH_NAV = [

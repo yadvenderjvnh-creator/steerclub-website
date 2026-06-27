@@ -460,6 +460,53 @@ export const invoices = pgTable("invoices", {
   uniqSourceBooking: unique().on(t.source, t.bookingId),
 }));
 
+// Discount coupons applied at checkout.
+export const coupons = pgTable("coupons", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  type: varchar("type", { length: 10 }).notNull(), // flat | percent
+  value: integer("value").notNull(), // paise (flat) or percent (1-100)
+  minAmount: integer("min_amount").default(0), // paise
+  appliesTo: varchar("applies_to", { length: 20 }).default("all").notNull(), // all|assessment|program|event|membership
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  usageLimit: integer("usage_limit"), // null = unlimited
+  usedCount: integer("used_count").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const couponRedemptions = pgTable("coupon_redemptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  couponId: uuid("coupon_id").notNull().references(() => coupons.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  email: varchar("email", { length: 255 }),
+  source: varchar("source", { length: 20 }),
+  bookingId: uuid("booking_id"),
+  amountDiscounted: integer("amount_discounted").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// One referral code per member; redemptions tracked when referred friends pay.
+export const referralCodes = pgTable("referral_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  code: varchar("code", { length: 16 }).notNull().unique(),
+  rewardType: varchar("reward_type", { length: 20 }).default("credit"),
+  rewardValue: integer("reward_value").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const referralRedemptions = pgTable("referral_redemptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  referralCodeId: uuid("referral_code_id").notNull().references(() => referralCodes.id, { onDelete: "cascade" }),
+  referredEmail: varchar("referred_email", { length: 255 }),
+  source: varchar("source", { length: 20 }),
+  bookingId: uuid("booking_id"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending|qualified|rewarded
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Gift purchases (membership or program), redeemable by a recipient via code.
 export const giftPurchases = pgTable("gift_purchases", {
   id: uuid("id").primaryKey().defaultRandom(),
