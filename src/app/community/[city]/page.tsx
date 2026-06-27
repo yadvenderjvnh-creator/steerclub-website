@@ -3,6 +3,17 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Users, Calendar, MapPin, Trophy } from "lucide-react";
 import { buildWhatsAppLink, WA_MESSAGES } from "@/lib/whatsapp";
+import { getPublishedEvents } from "@/lib/community/queries";
+
+export const dynamic = "force-dynamic";
+
+const TYPE_LABELS: Record<string, string> = {
+  "city-drive": "City Drive",
+  workshop: "Workshop",
+  "road-trip": "Road Trip",
+  "track-day": "Track Day",
+  steerFest: "SteerFest",
+};
 
 type Chapter = {
   city: string;
@@ -110,6 +121,19 @@ export default async function CityChapterPage({
   const chapter = CHAPTERS[city];
   if (!chapter) notFound();
 
+  // Overlay live events for this city; fall back to editorial copy when none are published.
+  const allEvents = await getPublishedEvents();
+  const cityEvents = allEvents.filter((e) => e.city === city);
+  const upcoming =
+    cityEvents.length > 0
+      ? cityEvents.map((e) => ({
+          title: e.title,
+          date: new Date(e.eventDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+          type: TYPE_LABELS[e.type] ?? e.type,
+          slug: e.slug as string | null,
+        }))
+      : chapter.upcoming.map((u) => ({ ...u, slug: null as string | null }));
+
   return (
     <div className="pt-24 bg-asphalt min-h-screen">
       <section className="section-pad">
@@ -146,7 +170,7 @@ export default async function CityChapterPage({
                 <div className="glass rounded-xl p-5">
                   <Trophy className="w-5 h-5 text-lime mb-3" />
                   <p className="font-heading font-black text-2xl text-white">
-                    {chapter.upcoming.length}
+                    {upcoming.length}
                   </p>
                   <p className="text-xs text-steel font-ui uppercase tracking-wide">
                     Upcoming events
@@ -186,7 +210,7 @@ export default async function CityChapterPage({
               Upcoming in {chapter.cityLabel}
             </h2>
             <div className="space-y-4">
-              {chapter.upcoming.map((event) => (
+              {upcoming.map((event) => (
                 <div
                   key={event.title}
                   className="glass rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-lime/20 border border-transparent transition-all"
@@ -207,7 +231,7 @@ export default async function CityChapterPage({
                     </div>
                   </div>
                   <Link
-                    href="/events"
+                    href={event.slug ? `/events/${event.slug}` : "/events"}
                     className="text-lime font-heading font-black text-xs uppercase tracking-wide whitespace-nowrap hover:translate-x-1 transition-transform inline-block"
                   >
                     RSVP →

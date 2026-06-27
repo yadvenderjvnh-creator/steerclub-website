@@ -11,6 +11,7 @@ import {
   CreditCard,
   BookOpen,
   UserCog,
+  PartyPopper,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ const ADMIN_NAV = [
   { href: "/admin/assessments", label: "Assessments", icon: ClipboardList },
   { href: "/admin/programs", label: "Programs", icon: BookOpen },
   { href: "/admin/coaches", label: "Coaches", icon: UserCog },
+  { href: "/admin/community", label: "Community", icon: PartyPopper },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
 ];
 

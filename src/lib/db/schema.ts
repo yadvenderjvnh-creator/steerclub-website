@@ -47,6 +47,10 @@ export const attendanceStatusEnum = pgEnum("attendance_status", [
   "present", "absent", "late", "excused",
 ]);
 
+export const announcementAudienceEnum = pgEnum("announcement_audience", [
+  "all", "members", "city", "program",
+]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -232,13 +236,20 @@ export const events = pgTable("events", {
 
 export const eventRegistrations = pgTable("event_registrations", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id),
-  eventId: uuid("event_id").notNull().references(() => events.id),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
   status: bookingStatusEnum("status").default("confirmed").notNull(),
+  razorpayOrderId: text("razorpay_order_id"),
   razorpayPaymentId: text("razorpay_payment_id"),
   amount: integer("amount").default(0),
+  attended: boolean("attended").default(false).notNull(),
+  attendanceMarkedAt: timestamp("attendance_marked_at"),
+  markedById: uuid("marked_by_id").references(() => users.id),
+  reminderSentAt: timestamp("reminder_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  uniqUserEvent: unique().on(t.userId, t.eventId),
+}));
 
 export const blogPosts = pgTable("blog_posts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -375,5 +386,30 @@ export const activityLog = pgTable("activity_log", {
   entity: varchar("entity", { length: 100 }).notNull(),
   entityId: varchar("entity_id", { length: 255 }),
   meta: jsonb("meta"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Community announcements, targeted by audience/city.
+export const announcements = pgTable("announcements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body").notNull(),
+  audience: announcementAudienceEnum("audience").default("all").notNull(),
+  city: cityEnum("city"), // when audience = city
+  isPublished: boolean("is_published").default(false).notNull(),
+  publishedAt: timestamp("published_at"),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Community photo gallery (Cloudinary-hosted URLs), moderated before public.
+export const galleryPhotos = pgTable("gallery_photos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
+  imageUrl: text("image_url").notNull(),
+  caption: varchar("caption", { length: 255 }),
+  city: cityEnum("city"),
+  uploadedById: uuid("uploaded_by_id").references(() => users.id),
+  approved: boolean("approved").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

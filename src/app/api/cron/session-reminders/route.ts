@@ -1,6 +1,6 @@
 import { and, eq, isNull, gte, lte, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { programSessions, cohorts, programs, programBookings, instructors } from "@/lib/db/schema";
+import { programSessions, cohorts, programs, programBookings, instructors, events, eventRegistrations, users } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email";
 import { notifyUserByEmail } from "@/lib/portal/notify";
 
@@ -75,5 +75,47 @@ export async function GET(req: Request) {
     await db.update(programSessions).set({ reminderSentAt: now }).where(eq(programSessions.id, s.id));
   }
 
-  return Response.json({ ok: true, sessions: sessions.length, emails });
+  // ---- Event reminders (T-24h, per confirmed registration, idempotent) ----
+  const eventRegs = await db
+    .select({
+      regId: eventRegistrations.id,
+      name: users.name,
+      email: users.email,
+      title: events.title,
+      eventDate: events.eventDate,
+      location: events.location,
+      city: events.city,
+    })
+    .from(eventRegistrations)
+    .innerJoin(events, eq(eventRegistrations.eventId, events.id))
+    .innerJoin(users, eq(eventRegistrations.userId, users.id))
+    .where(
+      and(
+        eq(eventRegistrations.status, "confirmed"),
+        isNull(eventRegistrations.reminderSentAt),
+        gte(events.eventDate, now),
+        lte(events.eventDate, horizon)
+      )
+    );
+
+  let eventEmails = 0;
+  for (const r of eventRegs) {
+    const when = new Date(r.eventDate).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    const where = r.location ?? r.city;
+    await sendEmail({
+      to: r.email,
+      subject: `Reminder — ${r.title} on ${when}`,
+      html: `<p>Hi ${r.name},</p><p>Your SteerClub event <b>${r.title}</b> is coming up.</p><p><b>When:</b> ${when}<br/><b>Where:</b> ${where}</p><p>See you there. Earn the Road. — SteerClub</p>`,
+    });
+    await notifyUserByEmail(r.email, {
+      type: "event",
+      title: `Tomorrow: ${r.title}`,
+      body: `${when} · ${where}`,
+      link: "/dashboard/community",
+    });
+    await db.update(eventRegistrations).set({ reminderSentAt: now }).where(eq(eventRegistrations.id, r.regId));
+    eventEmails += 1;
+  }
+
+  return Response.json({ ok: true, sessions: sessions.length, emails, events: eventRegs.length, eventEmails });
 }
