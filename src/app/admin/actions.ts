@@ -13,6 +13,7 @@ import {
   steerScores,
   waitlist,
 } from "@/lib/db/schema";
+import { notifyUserByEmail } from "@/lib/portal/notify";
 
 type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled" | "refunded";
 type LeadStatus = "new" | "contacted" | "qualified" | "converted" | "lost";
@@ -123,6 +124,12 @@ export async function recordAssessment(input: {
   });
   await logActivity(admin.id, "assessment.record", "steer_score", input.email, {
     total: input.total,
+  });
+  await notifyUserByEmail(input.email, {
+    type: "score",
+    title: "Your Steer Score is ready",
+    body: `You scored ${input.total}/100. See your full breakdown and recommended program.`,
+    link: "/dashboard/score",
   });
   revalidatePath("/admin/assessments");
 }

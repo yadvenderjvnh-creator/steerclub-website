@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { assessmentBookings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sendWhatsAppNotification } from "@/lib/whatsapp";
+import { markLeadConverted } from "@/lib/portal/leads";
+import { notifyUserByEmail } from "@/lib/portal/notify";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +27,23 @@ export async function POST(req: NextRequest) {
     if (!isValid) {
       return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     }
+
+    // A paid booker is a converted lead.
+    const payerEmail = type === "gift" ? bookingData?.buyerEmail : bookingData?.email;
+    await markLeadConverted(payerEmail);
+    await notifyUserByEmail(payerEmail, {
+      type: "booking",
+      title:
+        type === "membership"
+          ? "Membership active"
+          : type === "program"
+            ? "Program seat reserved"
+            : type === "gift"
+              ? "Gift sent"
+              : "Assessment confirmed",
+      body: "Payment received — check your dashboard for details.",
+      link: "/dashboard",
+    });
 
     if (type === "assessment") {
       await db

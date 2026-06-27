@@ -48,8 +48,26 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").default("client").notNull(),
   emailVerified: timestamp("email_verified"),
   lastLoginAt: timestamp("last_login_at"),
+  // Client profile fields
+  emergencyContactName: varchar("emergency_contact_name", { length: 255 }),
+  emergencyContactPhone: varchar("emergency_contact_phone", { length: 20 }),
+  vehicleOwned: varchar("vehicle_owned", { length: 120 }),
+  drivingGoals: text("driving_goals"),
+  commPrefs: jsonb("comm_prefs").$type<{ email: boolean; whatsapp: boolean; sms: boolean }>(),
+  directoryVisible: boolean("directory_visible").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(), // score | booking | program | system
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body"),
+  link: varchar("link", { length: 255 }),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const accounts = pgTable("accounts", {

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { consumeLoginToken } from "@/lib/auth/tokens";
 import { createSession, type UserRole } from "@/lib/auth/session";
+import { reconcileUserData } from "@/lib/portal/reconcile";
 
 function adminEmails(): string[] {
   return (process.env.ADMIN_EMAILS ?? "")
@@ -57,6 +58,9 @@ export async function GET(req: NextRequest) {
       .returning({ id: users.id });
     userId = inserted[0].id;
   }
+
+  // Link any pre-account bookings/scores (captured by email) to this user.
+  await reconcileUserData(userId, email);
 
   await createSession(userId);
 

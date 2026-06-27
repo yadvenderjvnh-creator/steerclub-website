@@ -3,6 +3,7 @@ import { createOrder, PRICES } from "@/lib/razorpay";
 import { db } from "@/lib/db";
 import { assessmentBookings } from "@/lib/db/schema";
 import { getProgramBySlug } from "@/lib/utils";
+import { upsertLeadFromContact } from "@/lib/portal/leads";
 
 export async function POST(req: NextRequest) {
   try {
@@ -104,6 +105,24 @@ export async function POST(req: NextRequest) {
     } else {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
+
+    // Capture every booker as a CRM lead (de-duped by email) so the team can
+    // follow up in /admin/leads — including guests who never create an account.
+    const isGift = type === "gift";
+    await upsertLeadFromContact({
+      name: isGift ? customerData?.buyerName : customerData?.name,
+      email: isGift ? customerData?.buyerEmail : customerData?.email,
+      phone: isGift ? customerData?.buyerPhone : customerData?.phone,
+      city: isGift ? null : customerData?.city,
+      source:
+        type === "assessment"
+          ? "assessment-booking"
+          : type === "program"
+            ? "program-booking"
+            : type === "membership"
+              ? "membership"
+              : "gift",
+    });
 
     const order = await createOrder(amount, receipt, notes);
 
