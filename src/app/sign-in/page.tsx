@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import AuthForm from "@/components/shared/auth-form";
 
@@ -25,7 +26,9 @@ export default function SignInPage() {
           Sign in to see your score, your progress, and what&apos;s next.
         </p>
 
-        <AuthForm mode="sign-in" />
+        <Suspense fallback={<div className="glass rounded-2xl p-8 h-48" />}>
+          <AuthForm mode="sign-in" />
+        </Suspense>
 
         <p className="text-center text-sm text-steel font-ui mt-8">
           New to SteerClub?{" "}

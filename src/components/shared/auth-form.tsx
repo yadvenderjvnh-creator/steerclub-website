@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +18,8 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sentTo, setSentTo] = useState("");
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? undefined;
 
   const {
     register,
@@ -28,11 +31,17 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     setLoading(true);
     try {
       // Sends a magic sign-in link to the user's email.
-      await fetch("/api/auth/email", {
+      const res = await fetch("/api/auth/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, mode }),
+        body: JSON.stringify({ ...data, mode, next }),
       });
+      const json = await res.json().catch(() => ({}));
+      // In development the link is returned so the flow works without an email provider.
+      if (json?.devLink) {
+        window.location.href = json.devLink;
+        return;
+      }
       setSentTo(data.email);
       setSent(true);
     } catch {

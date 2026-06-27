@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Montserrat, Poppins, Inter } from "next/font/google";
 import "./globals.css";
-import { Nav } from "@/components/layout/nav";
-import { Footer } from "@/components/layout/footer";
-import { MobileBar } from "@/components/layout/mobile-bar";
-import { FloatingCTA } from "@/components/shared/floating-cta";
+import { SiteFrame } from "@/components/layout/site-frame";
 import { SchemaMarkup } from "@/components/shared/schema-markup";
 
 const montserrat = Montserrat({
@@ -74,11 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${montserrat.variable} ${poppins.variable} ${inter.variable}`}>
       <body>
         <SchemaMarkup />
-        <Nav />
-        <main>{children}</main>
-        <Footer />
-        <MobileBar />
-        <FloatingCTA />
+        <SiteFrame>{children}</SiteFrame>
       </body>
     </html>
   );

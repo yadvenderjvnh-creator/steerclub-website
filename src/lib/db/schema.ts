@@ -30,6 +30,14 @@ export const eventTypeEnum = pgEnum("event_type", [
   "city-drive", "workshop", "road-trip", "track-day", "steerFest",
 ]);
 
+export const userRoleEnum = pgEnum("user_role", [
+  "client", "parent", "coach", "admin",
+]);
+
+export const leadStatusEnum = pgEnum("lead_status", [
+  "new", "contacted", "qualified", "converted", "lost",
+]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -37,7 +45,9 @@ export const users = pgTable("users", {
   phone: varchar("phone", { length: 20 }),
   city: cityEnum("city"),
   image: text("image"),
+  role: userRoleEnum("role").default("client").notNull(),
   emailVerified: timestamp("email_verified"),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -62,6 +72,16 @@ export const sessions = pgTable("sessions", {
   sessionToken: varchar("session_token", { length: 255 }).notNull().unique(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   expires: timestamp("expires").notNull(),
+});
+
+// Single-use, hashed magic-link tokens for passwordless login.
+export const loginTokens = pgTable("login_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  identifier: varchar("identifier", { length: 255 }).notNull(), // email
+  tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
+  expires: timestamp("expires").notNull(),
+  consumedAt: timestamp("consumed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const steerScores = pgTable("steer_scores", {
@@ -247,5 +267,33 @@ export const leads = pgTable("leads", {
   utmCampaign: varchar("utm_campaign", { length: 100 }),
   pageUrl: text("page_url"),
   city: cityEnum("city"),
+  // Mini-CRM fields
+  status: leadStatusEnum("status").default("new").notNull(),
+  stage: varchar("stage", { length: 100 }),
+  assignedToId: uuid("assigned_to_id").references(() => users.id),
+  nextFollowUpAt: timestamp("next_follow_up_at"),
+  notes: text("notes"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Timeline of actions/notes against a lead (calls, messages, status changes).
+export const leadActivities = pgTable("lead_activities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(), // note | call | whatsapp | email | status_change
+  note: text("note"),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Audit trail for admin/coach mutations across the platform.
+export const activityLog = pgTable("activity_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  actorId: uuid("actor_id").references(() => users.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  entity: varchar("entity", { length: 100 }).notNull(),
+  entityId: varchar("entity_id", { length: 255 }),
+  meta: jsonb("meta"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import AuthForm from "@/components/shared/auth-form";
 
@@ -25,7 +26,9 @@ export default function SignUpPage() {
           Create your account. Then find out where you stand.
         </p>
 
-        <AuthForm mode="sign-up" />
+        <Suspense fallback={<div className="glass rounded-2xl p-8 h-48" />}>
+          <AuthForm mode="sign-up" />
+        </Suspense>
 
         <p className="text-center text-sm text-steel font-ui mt-8">
           Already have an account?{" "}
