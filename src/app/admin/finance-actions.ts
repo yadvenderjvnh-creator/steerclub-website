@@ -2,7 +2,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import {
   assessmentBookings,
@@ -41,7 +41,7 @@ export async function issueRefund(input: {
   email?: string | null;
   reason?: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("payments.refund");
   if (!input.paymentId) return { ok: false, error: "No Razorpay payment id on this booking." };
 
   let razorpayRefundId: string | null = null;

@@ -3,8 +3,9 @@ import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { sessions, users } from "@/lib/db/schema";
+import { sessions, users, rolePermissions } from "@/lib/db/schema";
 import { SESSION_COOKIE } from "./constants";
+import { DEFAULT_ROLE_PERMISSIONS, ALL_PERMISSION_KEYS } from "./permissions";
 
 export { SESSION_COOKIE };
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -87,6 +88,38 @@ export async function requireRole(
   if (!roles.includes(user.role)) {
     // Route a role mismatch somewhere sensible for that role.
     redirect(user.role === "coach" ? "/admin/coach" : "/dashboard");
+  }
+  return user;
+}
+
+// ---------- Granular RBAC (Phase 6.4) ----------
+
+/** Founder/ops allowlist — bypasses all permission checks. */
+export function isSuperAdmin(email: string): boolean {
+  const allow = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return allow.includes(email.toLowerCase());
+}
+
+/** Effective permission keys for a user. Super-admins get all; otherwise role grants (DB, else defaults). */
+export async function getUserPermissions(user: SessionUser): Promise<Set<string>> {
+  if (isSuperAdmin(user.email)) return new Set(ALL_PERMISSION_KEYS);
+  const rows = await db.select({ key: rolePermissions.permissionKey }).from(rolePermissions).where(eq(rolePermissions.role, user.role));
+  if (rows.length === 0) return new Set(DEFAULT_ROLE_PERMISSIONS[user.role] ?? []);
+  return new Set(rows.map((r) => r.key));
+}
+
+export async function checkPermission(user: SessionUser, key: string): Promise<boolean> {
+  if (isSuperAdmin(user.email)) return true;
+  const perms = await getUserPermissions(user);
+  return perms.has(key);
+}
+
+/** Require a specific permission; redirects if missing. Returns the user. */
+export async function requirePermission(key: string, next?: string): Promise<SessionUser> {
+  const user = await getSession();
+  if (!user) redirect(`/sign-in${next ? `?next=${encodeURIComponent(next)}` : ""}`);
+  if (!(await checkPermission(user, key))) {
+    redirect(user.role === "coach" ? "/admin/coach" : user.role === "admin" ? "/admin" : "/dashboard");
   }
   return user;
 }

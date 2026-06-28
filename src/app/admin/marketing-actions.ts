@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { coupons, campaigns, activityLog } from "@/lib/db/schema";
 import { dispatchCampaign } from "@/lib/marketing/dispatch";
@@ -19,7 +19,7 @@ export type CouponInput = {
 };
 
 export async function createCoupon(input: CouponInput): Promise<{ ok: boolean; error?: string }> {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("marketing.write");
   const code = input.code.trim().toUpperCase();
   if (!code) return { ok: false, error: "Code required." };
   if (input.type === "percent" && (input.value < 1 || input.value > 100)) return { ok: false, error: "Percent must be 1–100." };
@@ -44,14 +44,14 @@ export async function createCoupon(input: CouponInput): Promise<{ ok: boolean; e
 }
 
 export async function toggleCoupon(id: string, isActive: boolean) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("marketing.write");
   await db.update(coupons).set({ isActive }).where(eq(coupons.id, id));
   await db.insert(activityLog).values({ actorId: admin.id, action: isActive ? "coupon.enable" : "coupon.disable", entity: "coupon", entityId: id });
   revalidatePath("/admin/marketing");
 }
 
 export async function deleteCoupon(id: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("marketing.write");
   await db.delete(coupons).where(eq(coupons.id, id));
   await db.insert(activityLog).values({ actorId: admin.id, action: "coupon.delete", entity: "coupon", entityId: id });
   revalidatePath("/admin/marketing");
@@ -72,7 +72,7 @@ function renderBody(body: string, name: string | null) {
 }
 
 export async function createCampaign(input: CampaignInput): Promise<{ ok: boolean; id?: string; error?: string }> {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("marketing.write");
   if (!input.name || !input.body || !input.segment) return { ok: false, error: "Name, segment and body are required." };
   const [row] = await db
     .insert(campaigns)
@@ -93,7 +93,7 @@ export async function createCampaign(input: CampaignInput): Promise<{ ok: boolea
 }
 
 export async function sendTestCampaign(input: { subject?: string; body: string; toEmail: string }): Promise<{ ok: boolean }> {
-  await requireRole(["admin"]);
+  await requirePermission("marketing.write");
   const ok = await sendEmail({
     to: input.toEmail,
     subject: `[TEST] ${input.subject ?? "SteerClub"}`,
@@ -104,7 +104,7 @@ export async function sendTestCampaign(input: { subject?: string; body: string; 
 
 /** Dispatch a campaign now: email channel sends via Resend; whatsapp/push are no-op stubs. */
 export async function sendCampaignNow(id: string): Promise<{ ok: boolean; sent?: number; error?: string }> {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("marketing.write");
   const [c] = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
   if (!c) return { ok: false, error: "Campaign not found." };
   if (c.status === "sent") return { ok: false, error: "Already sent." };
@@ -123,7 +123,7 @@ export async function sendCampaignNow(id: string): Promise<{ ok: boolean; sent?:
 }
 
 export async function deleteCampaign(id: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("marketing.write");
   await db.delete(campaigns).where(eq(campaigns.id, id));
   await db.insert(activityLog).values({ actorId: admin.id, action: "campaign.delete", entity: "campaign", entityId: id });
   revalidatePath("/admin/marketing");
