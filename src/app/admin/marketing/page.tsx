@@ -1,14 +1,14 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { coupons, campaigns, referralCodes, referralRedemptions, users } from "@/lib/db/schema";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { SEGMENTS } from "@/lib/marketing/segments";
 import { MarketingManager, type CouponRow, type ReferrerRow, type CampaignRow } from "./marketing-manager";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminMarketingPage() {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("marketing.write");
 
   const [couponRows, campaignRows, referrerRows] = await Promise.all([
     db.select().from(coupons).orderBy(desc(coupons.createdAt)),

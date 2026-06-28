@@ -1,5 +1,5 @@
 import { IndianRupee, ShoppingBag, TrendingUp } from "lucide-react";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { getReportData } from "@/lib/finance/reports";
 import { StatCard } from "@/components/admin/stat-card";
 import { formatINR } from "@/lib/utils";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const PALETTE = ["#D7FF2F", "#7CC4FF", "#FF9F6B", "#B68CFF", "#5BE0A0", "#FF7AA2"];
 
 export default async function AdminReportsPage() {
-  await requireRole(["admin"]);
+  await requirePermission("reports.read");
   const data = await getReportData();
 
   const conv1 = data.funnel.leads ? Math.round((data.funnel.assessmentCustomers / data.funnel.leads) * 100) : 0;

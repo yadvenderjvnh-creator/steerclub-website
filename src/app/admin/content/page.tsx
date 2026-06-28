@@ -1,13 +1,13 @@
 import { desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { blogPosts, faqs, testimonials, banners } from "@/lib/db/schema";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { ContentManager, type PostRow, type FaqRow, type TestimonialRow, type BannerRow } from "./content-manager";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminContentPage() {
-  await requireRole(["admin"]);
+  await requirePermission("content.write");
   const [posts, faqRows, testRows, bannerRows] = await Promise.all([
     db.select().from(blogPosts).orderBy(desc(blogPosts.createdAt)).limit(100),
     db.select().from(faqs).orderBy(faqs.displayOrder),

@@ -2,14 +2,14 @@ import { IndianRupee, Clock, RotateCcw } from "lucide-react";
 import { StatCard } from "@/components/admin/stat-card";
 import { formatINR } from "@/lib/utils";
 import { PaymentsTable, type PaymentRow } from "./payments-table";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { getAllPayments, getRevenueSummary } from "@/lib/finance/queries";
 import { getAllInvoices } from "@/lib/billing/invoices";
 
 export const dynamic = "force-dynamic";
 
 export default async function PaymentsPage() {
-  await requireRole(["admin"]);
+  await requirePermission("payments.read");
   const [all, invoices] = await Promise.all([getAllPayments(), getAllInvoices()]);
   const { revenue, outstanding, refunded } = await getRevenueSummary(all);
 

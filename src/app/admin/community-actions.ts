@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import {
   events,
@@ -91,7 +91,7 @@ export type EventInput = {
 };
 
 export async function upsertEvent(input: EventInput) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   const values = {
     title: input.title,
     description: input.description,
@@ -122,7 +122,7 @@ export async function upsertEvent(input: EventInput) {
 }
 
 export async function togglePublishEvent(id: string, isPublished: boolean) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   await db.update(events).set({ isPublished }).where(eq(events.id, id));
   await log(admin.id, isPublished ? "event.publish" : "event.unpublish", "event", id);
   if (isPublished) await notifyEventPublished(id);
@@ -132,7 +132,7 @@ export async function togglePublishEvent(id: string, isPublished: boolean) {
 }
 
 export async function deleteEvent(id: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   await db.delete(events).where(eq(events.id, id)); // registrations cascade
   await log(admin.id, "event.delete", "event", id);
   revalidatePath("/admin/community");
@@ -140,7 +140,7 @@ export async function deleteEvent(id: string) {
 }
 
 export async function markEventAttendance(registrationId: string, attended: boolean) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   await db
     .update(eventRegistrations)
     .set({ attended, attendanceMarkedAt: new Date(), markedById: admin.id })
@@ -160,7 +160,7 @@ export type AnnouncementInput = {
 };
 
 export async function upsertAnnouncement(input: AnnouncementInput) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   const values = {
     title: input.title,
     body: input.body,
@@ -182,7 +182,7 @@ export async function upsertAnnouncement(input: AnnouncementInput) {
 }
 
 export async function publishAnnouncement(id: string, isPublished: boolean) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   await db
     .update(announcements)
     .set({ isPublished, publishedAt: isPublished ? new Date() : null })
@@ -193,7 +193,7 @@ export async function publishAnnouncement(id: string, isPublished: boolean) {
 }
 
 export async function deleteAnnouncement(id: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   await db.delete(announcements).where(eq(announcements.id, id));
   await log(admin.id, "announcement.delete", "announcement", id);
   revalidatePath("/admin/community");
@@ -209,7 +209,7 @@ export async function uploadGalleryPhoto(input: {
   eventId?: string | null;
   approved?: boolean;
 }) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   const url = await uploadToCloudinary(input.file, { folder: "steerclub/gallery" });
   if (!url) return { ok: false as const, error: "Image upload failed (Cloudinary not configured?)." };
   const [row] = await db
@@ -231,7 +231,7 @@ export async function uploadGalleryPhoto(input: {
 }
 
 export async function approveGalleryPhoto(id: string, approved: boolean) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   await db.update(galleryPhotos).set({ approved }).where(eq(galleryPhotos.id, id));
   await log(admin.id, approved ? "gallery.approve" : "gallery.unapprove", "gallery_photo", id);
   revalidatePath("/admin/community");
@@ -240,7 +240,7 @@ export async function approveGalleryPhoto(id: string, approved: boolean) {
 }
 
 export async function deleteGalleryPhoto(id: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("community.write");
   await db.delete(galleryPhotos).where(eq(galleryPhotos.id, id));
   await log(admin.id, "gallery.delete", "gallery_photo", id);
   revalidatePath("/admin/community");

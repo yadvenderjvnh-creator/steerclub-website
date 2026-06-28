@@ -1,13 +1,15 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, waitlist, leadActivities, users } from "@/lib/db/schema";
 import { LeadsManager, type LeadRow, type WaitlistRow } from "./leads-manager";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
+import { branchScopeCity } from "@/lib/auth/branch";
 
 export const dynamic = "force-dynamic";
 
 export default async function LeadsPage() {
-  await requireRole(["admin"]);
+  const admin = await requirePermission("leads.write");
+  const scopeCity = await branchScopeCity(admin); // branch-scoped admins see only their city
   const [leadRows, waitlistRows, activities] = await Promise.all([
     db
       .select({
@@ -24,6 +26,7 @@ export default async function LeadsPage() {
         createdAt: leads.createdAt,
       })
       .from(leads)
+      .where(scopeCity ? sql`${leads.city} = ${scopeCity}` : undefined)
       .orderBy(desc(leads.createdAt)),
     db.select().from(waitlist).orderBy(desc(waitlist.createdAt)),
     db

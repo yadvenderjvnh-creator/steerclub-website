@@ -1,16 +1,17 @@
 import { desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { orgSettings, notificationTemplates, apiKeys, users, activityLog } from "@/lib/db/schema";
-import { requireRole } from "@/lib/auth/session";
+import { orgSettings, notificationTemplates, apiKeys, users, activityLog, rolePermissions, branches } from "@/lib/db/schema";
+import { requirePermission } from "@/lib/auth/session";
 import { TEMPLATE_DEFAULTS } from "@/lib/notifications/templates";
-import { SettingsManager, type AuditRow, type TeamRow, type TemplateRow, type ApiKeyRow, type OrgSettings } from "./settings-manager";
+import { PERMISSIONS } from "@/lib/auth/permissions";
+import { SettingsManager, type AuditRow, type TeamRow, type TemplateRow, type ApiKeyRow, type OrgSettings, type BranchRow } from "./settings-manager";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
-  await requireRole(["admin"]);
+  await requirePermission("settings.manage");
 
-  const [org, templates, keys, team, audit] = await Promise.all([
+  const [org, templates, keys, team, audit, grants, branchRows] = await Promise.all([
     db.select().from(orgSettings).limit(1),
     db.select().from(notificationTemplates),
     db.select().from(apiKeys).where(isNull(apiKeys.revokedAt)).orderBy(desc(apiKeys.createdAt)),
@@ -21,7 +22,12 @@ export default async function AdminSettingsPage() {
       .leftJoin(users, eq(activityLog.actorId, users.id))
       .orderBy(desc(activityLog.createdAt))
       .limit(300),
+    db.select().from(rolePermissions),
+    db.select().from(branches).orderBy(branches.city),
   ]);
+
+  const grantSet = new Set(grants.map((g) => `${g.role}:${g.permissionKey}`));
+  const branchData: BranchRow[] = branchRows.map((b) => ({ id: b.id, city: b.city, name: b.name, isActive: b.isActive }));
 
   const orgRow: OrgSettings = {
     legalName: org[0]?.legalName ?? "",
@@ -49,7 +55,16 @@ export default async function AdminSettingsPage() {
         <h1 className="font-heading font-black text-3xl text-white uppercase">Settings</h1>
         <p className="text-steel text-sm font-ui mt-1">Audit log, team, branding & tax, templates, API keys.</p>
       </div>
-      <SettingsManager org={orgRow} templates={templateRows} apiKeysList={keyRows} team={teamRows} audit={auditRows} />
+      <SettingsManager
+        org={orgRow}
+        templates={templateRows}
+        apiKeysList={keyRows}
+        team={teamRows}
+        audit={auditRows}
+        permissions={PERMISSIONS}
+        grants={[...grantSet]}
+        branches={branchData}
+      />
     </div>
   );
 }

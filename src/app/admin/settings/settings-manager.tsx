@@ -2,24 +2,30 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveOrgSettings, inviteAdmin, upsertTemplate, createApiKeyAction, revokeApiKey } from "../settings-actions";
+import { saveOrgSettings, inviteAdmin, upsertTemplate, createApiKeyAction, revokeApiKey, setRolePermission, createBranch, toggleBranch } from "../settings-actions";
+import { CITIES } from "@/lib/utils";
 
 export type AuditRow = { id: string; action: string; entity: string; entityId: string | null; actorName: string | null; createdAt: string };
 export type TeamRow = { id: string; name: string; email: string; role: string };
 export type TemplateRow = { key: string; subject: string; body: string; overridden: boolean };
 export type ApiKeyRow = { id: string; name: string; prefix: string; lastUsedAt: string | null; createdAt: string };
 export type OrgSettings = { legalName: string; gstin: string; gstRate: number; hsn: string; supportEmail: string; brandLogoUrl: string };
+export type BranchRow = { id: string; city: string; name: string; isActive: boolean };
+export type Perm = { key: string; module: string; label: string };
+type ManagerRole = "admin" | "coach";
 
 const input = "w-full bg-graphite border border-white/10 text-white text-sm font-ui px-3 py-2 rounded-lg focus:outline-none focus:border-lime/50";
 const label = "block text-xs font-ui uppercase tracking-widest text-steel mb-1.5";
 const btn = "bg-lime text-asphalt font-heading font-black text-sm uppercase px-5 py-2.5 rounded-lg hover:bg-lime/90 disabled:opacity-50";
 const ghost = "border border-white/15 text-white/80 font-heading font-black text-xs uppercase px-3 py-1.5 rounded-lg hover:bg-white/5";
 
-export function SettingsManager({ org, templates, apiKeysList, team, audit }: { org: OrgSettings; templates: TemplateRow[]; apiKeysList: ApiKeyRow[]; team: TeamRow[]; audit: AuditRow[] }) {
-  const [tab, setTab] = useState<"audit" | "team" | "branding" | "templates" | "apikeys">("audit");
+export function SettingsManager({ org, templates, apiKeysList, team, audit, permissions, grants, branches }: { org: OrgSettings; templates: TemplateRow[]; apiKeysList: ApiKeyRow[]; team: TeamRow[]; audit: AuditRow[]; permissions: Perm[]; grants: string[]; branches: BranchRow[] }) {
+  const [tab, setTab] = useState<"audit" | "team" | "roles" | "branches" | "branding" | "templates" | "apikeys">("audit");
   const tabs = [
     { id: "audit" as const, label: "Audit Log" },
     { id: "team" as const, label: "Team" },
+    { id: "roles" as const, label: "Roles & Permissions" },
+    { id: "branches" as const, label: "Branches" },
     { id: "branding" as const, label: "Branding & Tax" },
     { id: "templates" as const, label: "Templates" },
     { id: "apikeys" as const, label: "API Keys" },
@@ -33,10 +39,84 @@ export function SettingsManager({ org, templates, apiKeysList, team, audit }: { 
       </div>
       {tab === "audit" && <AuditTab audit={audit} />}
       {tab === "team" && <TeamTab team={team} />}
+      {tab === "roles" && <RolesTab permissions={permissions} grants={new Set(grants)} />}
+      {tab === "branches" && <BranchesTab branches={branches} />}
       {tab === "branding" && <BrandingTab org={org} />}
       {tab === "templates" && <TemplatesTab templates={templates} />}
       {tab === "apikeys" && <ApiKeysTab keys={apiKeysList} />}
     </div>
+  );
+}
+
+function RolesTab({ permissions, grants }: { permissions: Perm[]; grants: Set<string> }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const roles: ManagerRole[] = ["admin", "coach"];
+  function toggle(role: ManagerRole, key: string, on: boolean) {
+    startTransition(async () => { await setRolePermission(role, key, on); router.refresh(); });
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-steel text-xs font-ui">Grant or revoke permissions per role. The founder (ADMIN_EMAILS) always has full access regardless of this matrix.</p>
+      <div className="glass rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-white/5"><th className="text-left font-ui text-xs uppercase tracking-widest text-steel px-4 py-3">Permission</th>{roles.map((r) => <th key={r} className="font-ui text-xs uppercase tracking-widest text-steel px-4 py-3 capitalize">{r}</th>)}</tr></thead>
+          <tbody>
+            {permissions.map((p) => (
+              <tr key={p.key} className="border-t border-white/5">
+                <td className="px-4 py-2.5"><span className="text-white">{p.label}</span><span className="text-steel text-xs ml-2">{p.module}</span></td>
+                {roles.map((r) => {
+                  const on = grants.has(`${r}:${p.key}`);
+                  return (
+                    <td key={r} className="px-4 py-2.5 text-center">
+                      <button onClick={() => toggle(r, p.key, !on)} disabled={pending} className={`w-9 h-5 rounded-full relative transition-colors ${on ? "bg-lime" : "bg-white/15"} disabled:opacity-50`}>
+                        <span className={`absolute top-0.5 ${on ? "left-[18px]" : "left-0.5"} w-4 h-4 rounded-full bg-asphalt transition-all`} />
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function BranchesTab({ branches }: { branches: BranchRow[] }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [city, setCity] = useState<string>("chandigarh");
+  const [name, setName] = useState("");
+  function add() {
+    if (!name.trim()) return;
+    startTransition(async () => { await createBranch(city as "chandigarh", name); setName(""); router.refresh(); });
+  }
+  return (
+    <div className="space-y-5">
+      <div className="glass rounded-xl p-5 flex flex-wrap items-end gap-3">
+        <div><label className={label}>City</label><select className={`${input} appearance-none capitalize`} value={city} onChange={(e) => setCity(e.target.value)}>{CITIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
+        <div className="flex-1 min-w-[180px]"><label className={label}>Branch name</label><input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Chandigarh HQ" /></div>
+        <button onClick={add} disabled={pending || !name.trim()} className={btn}>{pending ? "…" : "Add branch"}</button>
+      </div>
+      <div className="glass rounded-xl divide-y divide-white/5">
+        {branches.length === 0 ? <p className="p-12 text-center text-steel font-ui text-sm">No branches yet.</p> : branches.map((b) => (
+          <div key={b.id} className="p-4 flex items-center justify-between">
+            <div><p className="text-white font-ui">{b.name}</p><p className="text-steel text-xs capitalize">{b.city}</p></div>
+            <ToggleBranchBtn id={b.id} active={b.isActive} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ToggleBranchBtn({ id, active }: { id: string; active: boolean }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  return (
+    <button onClick={() => startTransition(async () => { await toggleBranch(id, !active); router.refresh(); })} disabled={pending} className={`text-[10px] font-ui uppercase tracking-widest px-2.5 py-1 rounded-full border ${active ? "border-lime/40 text-lime bg-lime/10" : "border-white/15 text-steel"} disabled:opacity-50`}>{active ? "Active" : "Off"}</button>
   );
 }
 

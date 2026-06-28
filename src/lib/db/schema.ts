@@ -68,6 +68,7 @@ export const users = pgTable("users", {
   drivingGoals: text("driving_goals"),
   commPrefs: jsonb("comm_prefs").$type<{ email: boolean; whatsapp: boolean; sms: boolean }>(),
   directoryVisible: boolean("directory_visible").default(false).notNull(),
+  branchId: uuid("branch_id"), // staff branch scope (null = HQ/all); FK added in migration
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -617,6 +618,25 @@ export const notificationTemplates = pgTable("notification_templates", {
   subject: varchar("subject", { length: 255 }),
   body: text("body").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ---------- Phase 6: Granular RBAC + branches ----------
+// Permission grants per role (the catalog of keys lives in src/lib/auth/permissions.ts).
+export const rolePermissions = pgTable("role_permissions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  role: userRoleEnum("role").notNull(),
+  permissionKey: varchar("permission_key", { length: 60 }).notNull(),
+}, (t) => ({
+  uniqRolePerm: unique().on(t.role, t.permissionKey),
+}));
+
+// Multi-city branches; admins/coaches can be scoped to one (null = HQ/all).
+export const branches = pgTable("branches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  city: cityEnum("city").notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Parent ↔ student links (read-only family access). Student- or admin-initiated.
