@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Clock, ArrowLeft } from "lucide-react";
+import { getPostBySlug } from "@/lib/content/queries";
+
+export const dynamic = "force-dynamic";
+
+type Article = { title: string; excerpt: string; category: string; readTime: number; content: string; publishedAt: string; author: string };
 
 const ARTICLES: Record<string, {
   title: string;
@@ -81,20 +86,39 @@ Your license was the beginning. This is what comes next.
   },
 };
 
+async function resolveArticle(slug: string): Promise<Article | null> {
+  const post = await getPostBySlug(slug);
+  if (post) {
+    return {
+      title: post.title,
+      excerpt: post.excerpt,
+      category: post.category,
+      readTime: post.readTimeMinutes ?? 5,
+      content: post.content,
+      publishedAt: post.publishedAt ? new Date(post.publishedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "",
+      author: post.authorName ?? "SteerClub Team",
+    };
+  }
+  return ARTICLES[slug] ?? null;
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const article = ARTICLES[slug];
+  const post = await getPostBySlug(slug);
+  const article = post ?? ARTICLES[slug];
   if (!article) return {};
+  const title = (post?.metaTitle ?? null) || article.title;
+  const description = (post?.metaDescription ?? null) || article.excerpt;
   return {
-    title: article.title,
-    description: article.excerpt,
-    openGraph: { title: article.title, description: article.excerpt, type: "article" },
+    title,
+    description,
+    openGraph: { title, description, type: "article" },
   };
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const article = ARTICLES[slug];
+  const article = await resolveArticle(slug);
   if (!article) notFound();
 
   const schemaMarkup = {
