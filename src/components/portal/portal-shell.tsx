@@ -12,6 +12,7 @@ import {
   Trophy,
   Users,
   Gift,
+  HeartHandshake,
   User,
   Bell,
   LogOut,
@@ -28,7 +29,14 @@ const NAV = [
   { href: "/dashboard/payments", label: "Payments", icon: CreditCard },
   { href: "/dashboard/achievements", label: "Achievements", icon: Trophy },
   { href: "/dashboard/refer", label: "Refer & Earn", icon: Gift },
+  { href: "/dashboard/family", label: "Family", icon: HeartHandshake },
   { href: "/dashboard/profile", label: "Profile", icon: User },
+];
+
+// Parents get a trimmed, read-only nav.
+const PARENT_NAV = [
+  { href: "/dashboard/family", label: "Family", icon: HeartHandshake, exact: false },
+  { href: "/dashboard/profile", label: "Profile", icon: User, exact: false },
 ];
 
 export function PortalShell({
@@ -36,13 +44,14 @@ export function PortalShell({
   unreadCount,
   children,
 }: {
-  user: { name: string; email: string };
+  user: { name: string; email: string; role?: string };
   unreadCount: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const items = user.role === "parent" ? PARENT_NAV : NAV;
 
-  const navLinks = NAV.map(({ href, label, icon: Icon, exact }) => {
+  const navLinks = items.map(({ href, label, icon: Icon, exact }) => {
     const active = exact ? pathname === href : pathname.startsWith(href);
     return (
       <Link

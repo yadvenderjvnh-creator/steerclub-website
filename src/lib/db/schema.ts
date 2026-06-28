@@ -619,6 +619,19 @@ export const notificationTemplates = pgTable("notification_templates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Parent ↔ student links (read-only family access). Student- or admin-initiated.
+export const parentLinks = pgTable("parent_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  parentUserId: uuid("parent_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  studentUserId: uuid("student_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  relationship: varchar("relationship", { length: 40 }),
+  approved: boolean("approved").default(true).notNull(),
+  invitedByUserId: uuid("invited_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniqParentStudent: unique().on(t.parentUserId, t.studentUserId),
+}));
+
 // Programmatic API keys (hash stored, shown once on creation).
 export const apiKeys = pgTable("api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),
