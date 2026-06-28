@@ -1,7 +1,7 @@
 import { and, desc, eq, like, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { invoices, users } from "@/lib/db/schema";
-import { computeGstBreakup } from "./issuer";
+import { getGstBreakup } from "./config";
 
 /** Next sequential invoice number for the current FY-ish year: SC/2026/00001. */
 async function nextInvoiceNumber(): Promise<string> {
@@ -43,7 +43,7 @@ export async function ensureInvoice(input: {
       userId = u?.id ?? null;
     }
 
-    const breakup = computeGstBreakup(input.amount);
+    const breakup = await getGstBreakup(input.amount);
     // Retry a couple of times on number collisions (low volume, no sequence table).
     for (let attempt = 0; attempt < 4; attempt++) {
       const number = await nextInvoiceNumber();

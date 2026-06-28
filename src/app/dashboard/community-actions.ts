@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { events, eventRegistrations, memberships, notifications, users } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email";
+import { renderTemplate } from "@/lib/notifications/templates";
 
 type RsvpResult = { ok: boolean; error?: string };
 
@@ -62,11 +63,13 @@ export async function rsvpEvent(eventSlug: string): Promise<RsvpResult> {
     body: `${new Date(ev.eventDate).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} · ${ev.location}`,
     link: "/dashboard/community",
   });
-  await sendEmail({
-    to: user.email,
-    subject: `RSVP confirmed — ${ev.title}`,
-    html: `<p>Hi ${user.name},</p><p>You're registered for <strong>${ev.title}</strong> on ${new Date(ev.eventDate).toLocaleString("en-IN", { dateStyle: "full", timeStyle: "short" })} at ${ev.location}.</p><p>See you there. Earn the Road.<br/>— SteerClub</p>`,
+  const rendered = await renderTemplate("event_rsvp", {
+    name: user.name,
+    title: ev.title,
+    when: new Date(ev.eventDate).toLocaleString("en-IN", { dateStyle: "full", timeStyle: "short" }),
+    location: ev.location,
   });
+  if (rendered) await sendEmail({ to: user.email, subject: rendered.subject, html: rendered.html });
 
   revalidatePath("/dashboard/community");
   revalidatePath("/dashboard/calendar");
