@@ -595,3 +595,39 @@ export const banners = pgTable("banners", {
   displayOrder: integer("display_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ---------- Phase 6: Settings & governance ----------
+// Singleton org/branding/tax config (one row). issuer.ts reads this first, env fallback.
+export const orgSettings = pgTable("org_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  legalName: varchar("legal_name", { length: 255 }),
+  gstin: varchar("gstin", { length: 20 }),
+  gstRate: integer("gst_rate"),
+  hsn: varchar("hsn", { length: 20 }),
+  supportEmail: varchar("support_email", { length: 255 }),
+  brandLogoUrl: text("brand_logo_url"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Editable transactional templates (key e.g. booking_confirmed). renderTemplate falls back to code.
+export const notificationTemplates = pgTable("notification_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: varchar("key", { length: 60 }).notNull().unique(),
+  channel: varchar("channel", { length: 10 }).default("email").notNull(),
+  subject: varchar("subject", { length: 255 }),
+  body: text("body").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Programmatic API keys (hash stored, shown once on creation).
+export const apiKeys = pgTable("api_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 120 }).notNull(),
+  prefix: varchar("prefix", { length: 12 }).notNull(),
+  tokenHash: varchar("token_hash", { length: 128 }).notNull().unique(),
+  scopes: jsonb("scopes").$type<string[]>(),
+  lastUsedAt: timestamp("last_used_at"),
+  createdById: uuid("created_by_id").references(() => users.id),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

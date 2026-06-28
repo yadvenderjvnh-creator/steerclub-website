@@ -15,6 +15,7 @@ import {
   Megaphone,
   BarChart3,
   FileText,
+  Settings,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const ADMIN_NAV = [
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
   { href: "/admin/content", label: "Content", icon: FileText },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 const COACH_NAV = [
