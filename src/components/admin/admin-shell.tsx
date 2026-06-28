@@ -13,6 +13,7 @@ import {
   UserCog,
   PartyPopper,
   Megaphone,
+  BarChart3,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const ADMIN_NAV = [
   { href: "/admin/community", label: "Community", icon: PartyPopper },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone },
+  { href: "/admin/reports", label: "Reports", icon: BarChart3 },
 ];
 
 const COACH_NAV = [
