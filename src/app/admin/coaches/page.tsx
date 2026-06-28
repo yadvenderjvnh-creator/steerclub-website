@@ -1,13 +1,13 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { instructors, programSessions } from "@/lib/db/schema";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { CoachesManager, type CoachRow } from "./coaches-manager";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCoachesPage() {
-  await requireRole(["admin"]);
+  await requirePermission("coaches.write");
 
   const [coachRows, sessionCounts] = await Promise.all([
     db.select().from(instructors).orderBy(instructors.name),

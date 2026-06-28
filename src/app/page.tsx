@@ -5,6 +5,8 @@ import { ProgramsGrid } from "@/components/home/programs-grid";
 import { Testimonials } from "@/components/home/testimonials";
 import { CommunityStrip } from "@/components/home/community-strip";
 import { CTABand } from "@/components/home/cta-band";
+import { Banner } from "@/components/content/banner";
+import { getPublishedTestimonials } from "@/lib/content/queries";
 
 export const metadata: Metadata = {
   title: "SteerClub — Earn the Road.™ | India's Driving Confidence Platform",
@@ -12,13 +14,24 @@ export const metadata: Metadata = {
     "Take your Steer Score — India's first driving competence benchmark. 30-minute in-vehicle assessment, structured programs, and a community of drivers who take their driving seriously.",
 };
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  let testimonials: { name: string; city: string | null; quote: string }[] = [];
+  try {
+    const rows = await getPublishedTestimonials();
+    testimonials = rows.map((t) => ({ name: t.name, city: t.cityOrRole, quote: t.quote }));
+  } catch {
+    /* fall back to built-in testimonials */
+  }
+
   return (
     <>
+      <Banner placement="home" />
       <Hero />
       <ScoreIntro />
       <ProgramsGrid />
-      <Testimonials />
+      <Testimonials items={testimonials.length > 0 ? testimonials : undefined} />
       <CommunityStrip />
       <CTABand />
     </>

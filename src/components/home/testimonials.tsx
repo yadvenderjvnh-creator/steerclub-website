@@ -3,7 +3,16 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 
-const TESTIMONIALS = [
+export type TestimonialItem = {
+  name: string;
+  city: string | null;
+  quote: string;
+  program?: string | null;
+  scoreFrom?: number | null;
+  scoreTo?: number | null;
+};
+
+const TESTIMONIALS: TestimonialItem[] = [
   {
     name: "Priya Mehta",
     city: "Chandigarh",
@@ -38,7 +47,8 @@ const TESTIMONIALS = [
   },
 ];
 
-export function Testimonials() {
+export function Testimonials({ items }: { items?: TestimonialItem[] }) {
+  const data = items && items.length > 0 ? items : TESTIMONIALS;
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
@@ -62,7 +72,7 @@ export function Testimonials() {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {TESTIMONIALS.map((t, i) => (
+          {data.map((t, i) => (
             <motion.div
               key={t.name}
               initial={{ opacity: 0, y: 32 }}
@@ -70,18 +80,22 @@ export function Testimonials() {
               transition={{ duration: 0.5, delay: i * 0.1 }}
               className="glass rounded-xl p-7"
             >
-              {/* Score change */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className="flex items-center gap-2">
-                  <span className="font-heading font-black text-3xl text-steel">{t.scoreFrom}</span>
-                  <span className="text-steel text-sm">→</span>
-                  <span className="font-heading font-black text-3xl text-lime">{t.scoreTo}</span>
+              {/* Score change (only when present) */}
+              {t.scoreFrom != null && t.scoreTo != null ? (
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="flex items-center gap-2">
+                    <span className="font-heading font-black text-3xl text-steel">{t.scoreFrom}</span>
+                    <span className="text-steel text-sm">→</span>
+                    <span className="font-heading font-black text-3xl text-lime">{t.scoreTo}</span>
+                  </div>
+                  <div>
+                    {t.program && <p className="text-xs font-ui uppercase tracking-widest text-steel">{t.program}</p>}
+                    <p className="text-xs font-ui text-steel/60">{t.city}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-ui uppercase tracking-widest text-steel">{t.program}</p>
-                  <p className="text-xs font-ui text-steel/60">{t.city}</p>
-                </div>
-              </div>
+              ) : (
+                t.city && <p className="text-xs font-ui uppercase tracking-widest text-steel mb-4">{t.city}</p>
+              )}
 
               {/* Quote */}
               <blockquote className="text-white/80 font-body text-base leading-relaxed italic">

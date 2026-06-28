@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Check, Star } from "lucide-react";
 import { MEMBERSHIP_PLANS, formatINR } from "@/lib/utils";
 import { buildWhatsAppLink, WA_MESSAGES } from "@/lib/whatsapp";
+import { getPublishedFaqs } from "@/lib/content/queries";
+import { Banner } from "@/components/content/banner";
 
 export const metadata: Metadata = {
   title: "Membership — Steer Free, Member, Pro, Select",
@@ -10,9 +12,27 @@ export const metadata: Metadata = {
     "Join SteerClub. Four membership tiers from free to Select. Community access, monthly events, practice sessions, road trips, and the Steer Score app. From ₹799/month.",
 };
 
-export default function MembershipPage() {
+export const dynamic = "force-dynamic";
+
+const FALLBACK_FAQ = [
+  { q: "Can I join without doing an assessment first?", a: "You can join Steer Free without an assessment. For Member, Pro, and Select tiers, we recommend taking the assessment first — your score helps us personalise your experience and recommend the right programs." },
+  { q: "What happens after I complete a program?", a: "Program completion is the highest-intent moment to join a membership. We'll make you a specific offer based on your score improvement and what Member or Pro access unlocks for your next steps." },
+  { q: "Can I cancel my membership?", a: "Monthly memberships can be cancelled any time. Annual memberships are non-refundable after the first 7 days, but can be paused for up to 3 months." },
+  { q: "How does membership discount on programs work?", a: "Members automatically receive 15% off all programs at checkout. Applied to the current program price at the time of booking." },
+];
+
+export default async function MembershipPage() {
+  let faqs = FALLBACK_FAQ;
+  try {
+    const rows = await getPublishedFaqs();
+    if (rows.length > 0) faqs = rows.map((f) => ({ q: f.question, a: f.answer }));
+  } catch {
+    /* fall back to built-in FAQ */
+  }
+
   return (
     <div className="pt-24 bg-asphalt">
+      <Banner placement="membership" />
       {/* Header */}
       <section className="section-pad pb-12">
         <div className="container max-w-[1440px] text-center">
@@ -197,24 +217,7 @@ export default function MembershipPage() {
             Membership Questions
           </h2>
           <div className="space-y-6">
-            {[
-              {
-                q: "Can I join without doing an assessment first?",
-                a: "You can join Steer Free without an assessment. For Member, Pro, and Select tiers, we recommend taking the assessment first — your score helps us personalise your experience and recommend the right programs.",
-              },
-              {
-                q: "What happens after I complete a program?",
-                a: "Program completion is the highest-intent moment to join a membership. We'll make you a specific offer based on your score improvement and what Member or Pro access unlocks for your next steps.",
-              },
-              {
-                q: "Can I cancel my membership?",
-                a: "Monthly memberships can be cancelled any time. Annual memberships are non-refundable after the first 7 days, but can be paused for up to 3 months.",
-              },
-              {
-                q: "How does membership discount on programs work?",
-                a: "Members automatically receive 15% off all programs at checkout. Applied to the current program price at the time of booking.",
-              },
-            ].map((item) => (
+            {faqs.map((item) => (
               <div key={item.q} className="border-b border-white/10 pb-6">
                 <h3 className="font-heading font-black text-white text-sm uppercase tracking-wide mb-2">
                   {item.q}

@@ -3,14 +3,14 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { events, eventRegistrations, users } from "@/lib/db/schema";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { formatINR } from "@/lib/utils";
 import { EventRoster, type RegRow } from "./event-roster";
 
 export const dynamic = "force-dynamic";
 
 export default async function EventRosterPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole(["admin"]);
+  await requirePermission("community.write");
   const { id } = await params;
 
   const [ev] = await db.select().from(events).where(eq(events.id, id)).limit(1);

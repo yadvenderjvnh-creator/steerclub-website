@@ -1,15 +1,21 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { assessmentBookings, programBookings, programs } from "@/lib/db/schema";
 import { BookingsTable, type BookingRow } from "./bookings-table";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
+import { branchScopeCity } from "@/lib/auth/branch";
 
 export const dynamic = "force-dynamic";
 
 export default async function BookingsPage() {
-  await requireRole(["admin"]);
+  const admin = await requirePermission("bookings.write");
+  const scopeCity = await branchScopeCity(admin);
   const [asmt, progs] = await Promise.all([
-    db.select().from(assessmentBookings).orderBy(desc(assessmentBookings.createdAt)),
+    db
+      .select()
+      .from(assessmentBookings)
+      .where(scopeCity ? sql`${assessmentBookings.city} = ${scopeCity}` : undefined)
+      .orderBy(desc(assessmentBookings.createdAt)),
     db
       .select({
         id: programBookings.id,
@@ -24,6 +30,7 @@ export default async function BookingsPage() {
       })
       .from(programBookings)
       .leftJoin(programs, eq(programBookings.programId, programs.id))
+      .where(scopeCity ? sql`${programBookings.city} = ${scopeCity}` : undefined)
       .orderBy(desc(programBookings.createdAt)),
   ]);
 

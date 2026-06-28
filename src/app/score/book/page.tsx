@@ -5,8 +5,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { CheckCircle2, Lock, Clock, RotateCcw } from "lucide-react";
-import { CITIES } from "@/lib/utils";
+import { CITIES, formatINR } from "@/lib/utils";
 import { buildWhatsAppLink, WA_MESSAGES } from "@/lib/whatsapp";
+import { CouponField, type AppliedCoupon } from "@/components/checkout/coupon-field";
+
+const ASSESSMENT_PRICE = 29900;
 
 const bookingSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -35,6 +38,7 @@ export default function BookAssessmentPage() {
   const [step, setStep] = useState<Step>("details");
   const [loading, setLoading] = useState(false);
   const [bookingData, setBookingData] = useState<BookingForm | null>(null);
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
 
   const {
     register,
@@ -52,7 +56,7 @@ export default function BookAssessmentPage() {
       const res = await fetch("/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "assessment", customerData: data }),
+        body: JSON.stringify({ type: "assessment", customerData: data, couponCode: coupon?.code }),
       });
       const { orderId, amount, currency } = await res.json();
 
@@ -74,7 +78,7 @@ export default function BookAssessmentPage() {
             const verify = await fetch("/api/payments/verify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...response, type: "assessment", bookingData: data }),
+              body: JSON.stringify({ ...response, type: "assessment", bookingData: data, couponCode: coupon?.code, couponDiscount: coupon?.discount }),
             });
             if (verify.ok) setStep("confirmed");
           },
@@ -252,6 +256,9 @@ export default function BookAssessmentPage() {
               />
             </div>
 
+            {/* Coupon */}
+            <CouponField source="assessment" amount={ASSESSMENT_PRICE} applied={coupon} onApply={setCoupon} onClear={() => setCoupon(null)} />
+
             {/* Price summary */}
             <div className="glass rounded-xl p-5 flex items-center justify-between">
               <div>
@@ -259,8 +266,9 @@ export default function BookAssessmentPage() {
                 <p className="text-xs text-steel font-ui mt-0.5">30 min · Full score report · Instructor debrief</p>
               </div>
               <div className="text-right">
-                <p className="font-heading font-black text-2xl text-white">₹299</p>
-                <p className="text-xs text-steel font-ui">incl. GST</p>
+                {coupon && <p className="text-xs text-steel font-ui line-through">{formatINR(ASSESSMENT_PRICE)}</p>}
+                <p className="font-heading font-black text-2xl text-white">{formatINR(coupon ? coupon.finalAmount : ASSESSMENT_PRICE)}</p>
+                {coupon ? <p className="text-xs text-lime font-ui">Coupon {coupon.code} applied</p> : <p className="text-xs text-steel font-ui">incl. GST</p>}
               </div>
             </div>
 
@@ -269,7 +277,7 @@ export default function BookAssessmentPage() {
               disabled={loading}
               className="w-full bg-lime text-asphalt font-heading font-black text-base tracking-wide uppercase py-5 hover:bg-lime/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? "Processing..." : "Proceed to Payment — ₹299"}
+              {loading ? "Processing..." : `Proceed to Payment — ${formatINR(coupon ? coupon.finalAmount : ASSESSMENT_PRICE)}`}
             </button>
 
             <p className="text-center text-xs text-steel font-ui">
