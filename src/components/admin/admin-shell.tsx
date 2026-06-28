@@ -14,6 +14,7 @@ import {
   PartyPopper,
   Megaphone,
   BarChart3,
+  FileText,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ const ADMIN_NAV = [
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { href: "/admin/content", label: "Content", icon: FileText },
 ];
 
 const COACH_NAV = [

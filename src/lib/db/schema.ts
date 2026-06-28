@@ -558,3 +558,40 @@ export const giftPurchases = pgTable("gift_purchases", {
   redeemedAt: timestamp("redeemed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ---------- Phase 6: Content CMS ----------
+export const faqs = pgTable("faqs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  question: varchar("question", { length: 500 }).notNull(),
+  answer: text("answer").notNull(),
+  category: varchar("category", { length: 50 }),
+  displayOrder: integer("display_order").default(0).notNull(),
+  isPublished: boolean("is_published").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const testimonials = pgTable("testimonials", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  cityOrRole: varchar("city_or_role", { length: 120 }),
+  quote: text("quote").notNull(),
+  rating: integer("rating").default(5),
+  imageUrl: text("image_url"),
+  displayOrder: integer("display_order").default(0).notNull(),
+  isPublished: boolean("is_published").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const banners = pgTable("banners", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body"),
+  ctaLabel: varchar("cta_label", { length: 80 }),
+  ctaHref: varchar("cta_href", { length: 255 }),
+  placement: varchar("placement", { length: 20 }).default("global").notNull(), // home|membership|global
+  isActive: boolean("is_active").default(false).notNull(),
+  startsAt: timestamp("starts_at"),
+  endsAt: timestamp("ends_at"),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

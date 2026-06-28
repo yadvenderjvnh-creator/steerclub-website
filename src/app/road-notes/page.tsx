@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Clock, ArrowRight } from "lucide-react";
+import { getPublishedPosts } from "@/lib/content/queries";
 
 export const metadata: Metadata = {
   title: "Road Notes — India's Driving Knowledge Base",
   description:
     "SteerClub's Road Notes: practical, opinionated driving guides for Indian roads. City guides, technique breakdowns, route planning, member stories, and more.",
 };
+
+export const dynamic = "force-dynamic";
 
 const FEATURED_ARTICLES = [
   {
@@ -73,7 +76,13 @@ const CATEGORY_COLORS: Record<string, string> = {
   "member-stories": "text-purple-400 bg-purple-400/10",
 };
 
-export default function RoadNotesPage() {
+export default async function RoadNotesPage() {
+  const dbPosts = await getPublishedPosts();
+  const articles =
+    dbPosts.length > 0
+      ? dbPosts.map((p) => ({ slug: p.slug, title: p.title, excerpt: p.excerpt, category: p.category, readTime: p.readTimeMinutes ?? 5, tag: null as string | null }))
+      : FEATURED_ARTICLES;
+
   return (
     <div className="pt-24 bg-asphalt">
       <section className="section-pad">
@@ -116,29 +125,29 @@ export default function RoadNotesPage() {
           {/* Featured article */}
           <div className="mb-8">
             <Link
-              href={`/road-notes/${FEATURED_ARTICLES[0].slug}`}
+              href={`/road-notes/${articles[0].slug}`}
               className="group block glass rounded-2xl p-8 md:p-12 hover:border-lime/20 border border-transparent transition-all duration-300"
             >
               <div className="flex flex-wrap items-center gap-3 mb-4">
-                <span className={`text-xs font-ui uppercase tracking-widest px-3 py-1 rounded ${CATEGORY_COLORS[FEATURED_ARTICLES[0].category]}`}>
-                  {CATEGORIES.find(c => c.value === FEATURED_ARTICLES[0].category)?.label}
+                <span className={`text-xs font-ui uppercase tracking-widest px-3 py-1 rounded ${CATEGORY_COLORS[articles[0].category]}`}>
+                  {CATEGORIES.find(c => c.value === articles[0].category)?.label}
                 </span>
-                {FEATURED_ARTICLES[0].tag && (
+                {articles[0].tag && (
                   <span className="text-xs font-ui uppercase tracking-widest text-white/50 bg-white/5 px-3 py-1 rounded">
-                    {FEATURED_ARTICLES[0].tag}
+                    {articles[0].tag}
                   </span>
                 )}
               </div>
               <h2 className="font-heading font-black text-3xl md:text-4xl text-white uppercase mb-4 group-hover:text-lime transition-colors max-w-2xl">
-                {FEATURED_ARTICLES[0].title}
+                {articles[0].title}
               </h2>
               <p className="text-white/60 font-body text-lg leading-relaxed mb-6 max-w-xl">
-                {FEATURED_ARTICLES[0].excerpt}
+                {articles[0].excerpt}
               </p>
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1.5 text-xs text-steel font-ui">
                   <Clock className="w-3.5 h-3.5" />
-                  {FEATURED_ARTICLES[0].readTime} min read
+                  {articles[0].readTime} min read
                 </span>
                 <span className="text-lime font-heading font-black text-sm group-hover:gap-2 flex items-center gap-1 transition-all">
                   Read Article <ArrowRight className="w-4 h-4" />
@@ -149,7 +158,7 @@ export default function RoadNotesPage() {
 
           {/* Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {FEATURED_ARTICLES.slice(1).map((article) => (
+            {articles.slice(1).map((article) => (
               <Link
                 key={article.slug}
                 href={`/road-notes/${article.slug}`}
