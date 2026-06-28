@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Gauge, GraduationCap, User, ArrowRight, Bell } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import {
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardOverview() {
   const user = await requireUser();
+  if (user.role === "parent") redirect("/dashboard/family");
   const [{ latest }, profile, notifs, programs] = await Promise.all([
     getLatestScore(user),
     getProfile(user.id),
