@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import {
   assessmentBookings,
@@ -33,7 +33,7 @@ export async function updateBookingStatus(
   id: string,
   status: BookingStatus
 ) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("bookings.write");
   if (kind === "assessment") {
     await db
       .update(assessmentBookings)
@@ -56,7 +56,7 @@ export async function updateLead(
     notes?: string | null;
   }
 ) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("leads.write");
   await db
     .update(leads)
     .set({
@@ -72,14 +72,14 @@ export async function updateLead(
 }
 
 export async function addLeadActivity(leadId: string, type: string, note: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("leads.write");
   await db.insert(leadActivities).values({ leadId, type, note, createdById: admin.id });
   await db.update(leads).set({ updatedAt: new Date() }).where(eq(leads.id, leadId));
   revalidatePath("/admin/leads");
 }
 
 export async function convertWaitlistToLead(waitlistId: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("leads.write");
   const rows = await db.select().from(waitlist).where(eq(waitlist.id, waitlistId)).limit(1);
   const w = rows[0];
   if (!w) return;
@@ -114,7 +114,7 @@ export async function recordAssessment(input: {
   recommendedProgram: string;
   assessmentDate: string;
 }) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("assessments.write");
   await db.insert(steerScores).values({
     guestEmail: input.email.toLowerCase().trim(),
     total: input.total,

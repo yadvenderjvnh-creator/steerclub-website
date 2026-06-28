@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { getInvoiceById } from "@/lib/billing/invoices";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireRole(["admin"]);
+  await requirePermission("payments.read");
   const { id } = await params;
   const inv = await getInvoiceById(id);
   if (!inv) return new Response("Not found", { status: 404 });

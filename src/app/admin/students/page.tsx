@@ -1,15 +1,21 @@
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, assessmentBookings } from "@/lib/db/schema";
 import { StudentsTable, type StudentRow } from "./students-table";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
+import { branchScopeCity } from "@/lib/auth/branch";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentsPage() {
-  await requireRole(["admin"]);
+  const admin = await requirePermission("students.read");
+  const scopeCity = await branchScopeCity(admin);
   const [clientUsers, bookings] = await Promise.all([
-    db.select().from(users).where(eq(users.role, "client")).orderBy(desc(users.createdAt)),
+    db
+      .select()
+      .from(users)
+      .where(scopeCity ? and(eq(users.role, "client"), sql`${users.city} = ${scopeCity}`) : eq(users.role, "client"))
+      .orderBy(desc(users.createdAt)),
     db
       .select({ email: assessmentBookings.email, status: assessmentBookings.status })
       .from(assessmentBookings),

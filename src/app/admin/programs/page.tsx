@@ -1,13 +1,13 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { programs, cohorts, instructors, programBookings } from "@/lib/db/schema";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { ProgramsManager, type CohortRow, type ProgramOpt, type CoachOpt } from "./programs-manager";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminProgramsPage() {
-  await requireRole(["admin"]);
+  await requirePermission("programs.write");
 
   const [programRows, coachRows, cohortRows, unassignedCount] = await Promise.all([
     db.select({ id: programs.id, name: programs.name, sessions: programs.sessions }).from(programs).orderBy(programs.displayOrder),

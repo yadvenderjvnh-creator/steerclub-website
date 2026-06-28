@@ -1,13 +1,13 @@
 import { desc, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { events, announcements, galleryPhotos } from "@/lib/db/schema";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { CommunityManager, type EventRow, type AnnouncementRow, type PhotoRow } from "./community-manager";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCommunityPage() {
-  await requireRole(["admin"]);
+  await requirePermission("community.write");
 
   const [eventRows, annRows, photoRows] = await Promise.all([
     db

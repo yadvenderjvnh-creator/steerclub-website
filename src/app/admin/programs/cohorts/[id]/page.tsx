@@ -11,13 +11,13 @@ import {
   attendance,
   sessionFeedback,
 } from "@/lib/db/schema";
-import { requireRole } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { CohortDetail, type SessionRow, type EnrolleeRow, type UnassignedRow } from "./cohort-detail";
 
 export const dynamic = "force-dynamic";
 
 export default async function CohortDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole(["admin"]);
+  await requirePermission("programs.write");
   const { id } = await params;
 
   const cohortRows = await db

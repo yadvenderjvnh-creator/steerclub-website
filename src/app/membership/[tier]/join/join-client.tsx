@@ -8,6 +8,7 @@ import Link from "next/link";
 import { CheckCircle2, Check } from "lucide-react";
 import { CITIES, formatINR } from "@/lib/utils";
 import { buildWhatsAppLink, WA_MESSAGES } from "@/lib/whatsapp";
+import { CouponField, type AppliedCoupon } from "@/components/checkout/coupon-field";
 import type { MembershipPlan } from "@/types";
 
 const schema = z.object({
@@ -32,6 +33,7 @@ export default function MembershipJoinClient({ plan }: { plan: MembershipPlan })
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
 
   const {
     register,
@@ -54,6 +56,7 @@ export default function MembershipJoinClient({ plan }: { plan: MembershipPlan })
           tier: plan.tier,
           billing,
           customerData: data,
+          couponCode: coupon?.code,
         }),
       });
       const { orderId, amount, currency } = await res.json();
@@ -86,6 +89,8 @@ export default function MembershipJoinClient({ plan }: { plan: MembershipPlan })
                 tier: plan.tier,
                 billing,
                 bookingData: data,
+                couponCode: coupon?.code,
+                couponDiscount: coupon?.discount,
               }),
             });
             if (verify.ok) setConfirmed(true);
@@ -183,8 +188,9 @@ export default function MembershipJoinClient({ plan }: { plan: MembershipPlan })
             {/* Right — form */}
             <div className="glass rounded-2xl p-8">
               <div className="flex items-baseline gap-2 mb-1">
+                {coupon && <span className="text-steel font-ui text-lg line-through">{formatINR(price)}</span>}
                 <span className="font-heading font-black text-4xl text-white">
-                  {formatINR(price)}
+                  {formatINR(coupon ? coupon.finalAmount : price)}
                 </span>
                 <span className="text-steel font-ui text-sm">
                   /{billing === "annual" ? "year" : "month"}
@@ -255,12 +261,14 @@ export default function MembershipJoinClient({ plan }: { plan: MembershipPlan })
                   {errors.city && <p className="text-red-400 text-xs mt-1">{errors.city.message}</p>}
                 </div>
 
+                <CouponField source="membership" amount={price} applied={coupon} onApply={setCoupon} onClear={() => setCoupon(null)} />
+
                 <button
                   type="submit"
                   disabled={loading}
                   className="w-full bg-lime text-asphalt font-heading font-black text-base tracking-wide uppercase py-4 hover:bg-lime/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Processing..." : `Join — ${formatINR(price)}`}
+                  {loading ? "Processing..." : `Join — ${formatINR(coupon ? coupon.finalAmount : price)}`}
                 </button>
                 <p className="text-center text-xs text-steel font-ui">
                   Secure payment by Razorpay · Cancel anytime

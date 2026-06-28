@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { formatINR } from "@/lib/utils";
 import { rsvpEvent, cancelRsvp } from "@/app/dashboard/community-actions";
+import { CouponField, type AppliedCoupon } from "@/components/checkout/coupon-field";
 
 declare global {
   interface Window {
@@ -46,6 +47,7 @@ export function EventCTA({
   const [pending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
 
   // Already registered → confirmation + (free) cancel.
   if (registered) {
@@ -128,6 +130,7 @@ export function EventCTA({
           type: "event",
           eventSlug: slug,
           customerData: { name: user.name, email: user.email, phone: user.phone },
+          couponCode: coupon?.code,
         }),
       });
       const data = await res.json();
@@ -158,6 +161,8 @@ export function EventCTA({
                 ...response,
                 type: "event",
                 bookingData: { email: user.email, name: user.name, phone: user.phone, eventSlug: slug },
+                couponCode: coupon?.code,
+                couponDiscount: coupon?.discount,
               }),
             });
             if (verify.ok) router.refresh();
@@ -173,8 +178,9 @@ export function EventCTA({
 
   return (
     <div className="space-y-2">
+      <CouponField source="event" amount={price} applied={coupon} onApply={setCoupon} onClear={() => setCoupon(null)} />
       <button onClick={payAndRegister} disabled={loading} className={primary}>
-        {loading ? "Processing…" : `Register — ${formatINR(price)}`}
+        {loading ? "Processing…" : `Register — ${formatINR(coupon ? coupon.finalAmount : price)}`}
       </button>
       {err && <p className="text-orange-400 text-xs font-ui text-center">{err}</p>}
       <p className="text-steel text-xs font-ui text-center">Secure payment by Razorpay</p>

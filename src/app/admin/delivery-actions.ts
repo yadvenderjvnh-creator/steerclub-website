@@ -3,7 +3,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { requireRole, getSession } from "@/lib/auth/session";
+import { requirePermission, getSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import {
   cohorts,
@@ -35,7 +35,7 @@ export async function createCohort(input: {
   maxSize: number;
   instructorId?: string | null;
 }) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("programs.write");
   const inserted = await db
     .insert(cohorts)
     .values({
@@ -53,7 +53,7 @@ export async function createCohort(input: {
 
 /** Auto-generate the program's session count for a cohort, weekly from the start date. */
 export async function generateSessions(cohortId: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("programs.write");
   const rows = await db
     .select({ start: cohorts.startDate, instructorId: cohorts.instructorId, sessions: programs.sessions })
     .from(cohorts)
@@ -77,7 +77,7 @@ export async function generateSessions(cohortId: string) {
 }
 
 export async function updateSession(sessionId: string, data: { scheduledAt?: string; location?: string; status?: "scheduled" | "completed" | "cancelled" }) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("programs.write");
   await db
     .update(programSessions)
     .set({
@@ -91,7 +91,7 @@ export async function updateSession(sessionId: string, data: { scheduledAt?: str
 }
 
 export async function assignEnrollee(programBookingId: string, cohortId: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("programs.write");
   await db.update(programBookings).set({ cohortId }).where(eq(programBookings.id, programBookingId));
   await db.update(cohorts).set({ currentSize: sql`${cohorts.currentSize} + 1` }).where(eq(cohorts.id, cohortId));
   await log(admin.id, "cohort.assign_enrollee", "program_booking", programBookingId, { cohortId });
@@ -158,7 +158,7 @@ export async function markSessionComplete(sessionId: string) {
 // ---------- Program completion + certificate (admin) ----------
 
 export async function completeProgram(programBookingId: string) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("programs.write");
   const rows = await db
     .select({ id: programBookings.id, userId: programBookings.userId, email: programBookings.email, programId: programBookings.programId })
     .from(programBookings)
@@ -199,7 +199,7 @@ export async function inviteCoach(input: {
   ratePerSession?: number;
   bio?: string;
 }) {
-  const admin = await requireRole(["admin"]);
+  const admin = await requirePermission("coaches.write");
   const email = input.email.toLowerCase().trim();
 
   // Find-or-create the user, set role coach.
